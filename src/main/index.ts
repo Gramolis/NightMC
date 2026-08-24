@@ -50,9 +50,18 @@ import { addOfflineAccount, activeAccount, listAccounts, removeAccount, setActiv
 import { AuthError, getValidSession, isAuthConfigured, loginMicrosoft, refreshAccount } from './auth.js';
 import { offlineSession } from './offline.js';
 import { addServer, getServer, listServers, pingServer, removeServer, updateServer } from './servers.js';
-import { checkModUpdates, deleteMod, installMod, listMods, projectVersions, searchMods, toggleMod } from './mods.js';
+import { checkModUpdates, deleteMod, installMod, listMods, projectVersions, searchMods, toggleMod, updateMod } from './mods.js';
 import { exportMrpack, importPack, previewPack, repairPackFiles, setManualFile } from './packs.js';
-import { installPackBuilderItems, packCatalogVersions, searchPackCatalog } from './pack-builder.js';
+import {
+  installCatalogModpack,
+  checkCurseForgeUpdates,
+  installPackBuilderItems,
+  modpackCatalogVersions,
+  packCatalogVersions,
+  searchModpackCatalog,
+  searchPackCatalog,
+  updateCurseForgeMod,
+} from './pack-builder.js';
 import { launchGame, setLauncherVersion, stopAll, stopGame, runningGames } from './launcher.js';
 import { checkForUpdate, downloadUpdate, revealUpdate } from './updates.js';
 import { getNews } from './news.js';
@@ -461,7 +470,17 @@ function registerHandlers(): void {
     emit('event:instances-changed', null);
     return res;
   });
-  on('mods:checkUpdates', ({ instanceId }) => checkModUpdates(instanceId));
+  on('mods:checkUpdates', async ({ instanceId }) => [
+    ...(await checkModUpdates(instanceId)),
+    ...(await checkCurseForgeUpdates(instanceId)),
+  ]);
+  on('mods:update', async ({ instanceId, fileName, source, projectId, newVersionId }) => {
+    const mods = source === 'curseforge'
+      ? await updateCurseForgeMod(instanceId, fileName, projectId ?? '', newVersionId, emitProgress)
+      : await updateMod(instanceId, fileName, newVersionId, emitProgress);
+    emit('event:instances-changed', null);
+    return mods;
+  });
 
   /* --- paczki --- */
   on('packs:pickAndPreview', async () => {
@@ -513,6 +532,18 @@ function registerHandlers(): void {
     const result = await installPackBuilderItems(instanceId, items, emitProgress);
     emit('event:instances-changed', null);
     return result;
+  });
+  on('packBuilder:searchPacks', (input) => searchModpackCatalog(input));
+  on('packBuilder:packVersions', (input) => modpackCatalogVersions(input));
+  on('packBuilder:installPack', async (input) => {
+    const s = getSettings();
+    const instance = await installCatalogModpack(
+      input,
+      { memoryMin: s.defaultMemoryMin, memoryMax: s.defaultMemoryMax, jvmArgs: s.defaultJvmArgs },
+      emitProgress,
+    );
+    emit('event:instances-changed', null);
+    return instance;
   });
 
   /* --- Java --- */

@@ -326,6 +326,8 @@ export interface ModUpdate {
   newVersionId: string;
   newVersionNumber: string;
   newFileName: string;
+  source: 'modrinth' | 'curseforge';
+  projectId?: string;
 }
 
 /** Sprawdza dostępne aktualizacje modów przez API Modrinth (po sumach SHA-1). */
@@ -371,9 +373,30 @@ export async function checkModUpdates(instanceId: string): Promise<ModUpdate[]> 
       newVersionId: version.id,
       newVersionNumber: version.version_number,
       newFileName: file.filename,
+      source: 'modrinth',
+      projectId: version.project_id,
     });
   }
   return updates;
+}
+
+/** Instaluje znalezioną wersję i usuwa zastępowany plik, żeby nie zostawić dwóch wersji moda. */
+export async function updateMod(
+  instanceId: string,
+  fileName: string,
+  newVersionId: string,
+  onProgress?: (p: DownloadProgress) => void,
+): Promise<ModFile[]> {
+  const current = (await listMods(instanceId)).find((mod) => mod.fileName === fileName);
+  if (!current) throw new Error(`Nie znaleziono moda „${fileName}”.`);
+  const version = await getVersion(newVersionId);
+  const target = version.files.find((file) => file.primary) ?? version.files[0];
+  if (!target) throw new Error('Nowa wersja moda nie zawiera pliku do pobrania.');
+
+  await installMod(instanceId, newVersionId, { withDependencies: true, onProgress });
+  if (target.filename !== fileName) await deleteMod(instanceId, fileName);
+  log.info(`Zaktualizowano mod „${current.displayName ?? fileName}” do ${version.version_number}`, instanceId);
+  return listMods(instanceId);
 }
 
 /** Wykrywa duplikaty tego samego projektu w katalogu modów. */

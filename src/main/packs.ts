@@ -14,12 +14,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { ENDPOINTS } from '../shared/constants.js';
-import { DownloadQueue, verifyFile } from './downloader.js';
+import { DownloadQueue, hashFile, verifyFile } from './downloader.js';
 import { extractArchive, inspectArchive, readArchiveEntry, UnsafeArchiveError } from './zipsafe.js';
 import { createInstance, getInstance, refreshModCount } from './instances.js';
 import { getSecret, SECRET_KEYS } from './secrets.js';
 import { fetchJson, isAllowedUrl } from './net.js';
 import { log } from './logging.js';
+import { db } from './db.js';
 import type {
   CurseForgeManifest,
   DownloadProgress,
@@ -469,6 +470,7 @@ async function importCurseForge(
 
   // 2. Jeżeli użytkownik podał własny klucz API - dociągamy resztę.
   const apiKey = await getSecret(SECRET_KEYS.curseforgeApiKey());
+  const resolvedFiles: { projectID: number; fileID: number; info: NonNullable<Awaited<ReturnType<typeof curseForgeFileInfo>>> }[] = [];
   if (apiKey && manifest.files.length > 0) {
     const queue = new DownloadQueue({ onProgress, phase: 'Pobieranie modów z CurseForge' });
     for (const f of manifest.files) {
@@ -477,6 +479,7 @@ async function importCurseForge(
         log.warn(`CurseForge: plik ${f.projectID}/${f.fileID} ma wyłączone pobieranie przez API - wskaż go ręcznie`);
         continue;
       }
+      resolvedFiles.push({ projectID: f.projectID, fileID: f.fileID, info });
       if (fs.existsSync(path.join(modsTarget, info.fileName))) continue;
       queue.add({
         id: `${f.projectID}-${f.fileID}`,
@@ -488,6 +491,27 @@ async function importCurseForge(
       });
     }
     if (queue.size > 0) await queue.run();
+  }
+
+  const saveMod = db().prepare(
+    `INSERT INTO instance_mods (instance_id, file_name, project_id, version_id, display_name, loaders, game_versions, sha1)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(instance_id, file_name) DO UPDATE SET project_id=excluded.project_id,
+       version_id=excluded.version_id, display_name=excluded.display_name, sha1=excluded.sha1`,
+  );
+  for (const { projectID, fileID, info } of resolvedFiles) {
+    const local = path.join(modsTarget, info.fileName);
+    if (!fs.existsSync(local)) continue;
+    saveMod.run(
+      instance.id,
+      info.fileName,
+      `curseforge:${projectID}`,
+      `curseforge:${fileID}`,
+      info.displayName,
+      target.loader,
+      manifest.minecraft.version,
+      await hashFile(local, 'sha1'),
+    );
   }
 
   await savePackLock(instance, {

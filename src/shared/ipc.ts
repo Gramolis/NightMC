@@ -212,6 +212,13 @@ export const INVOKE_SCHEMAS = {
   }),
   'mods:install': v.object({ instanceId: id(), versionId: v.string({ max: 64, pattern: /^[A-Za-z0-9]{1,64}$/ }), withDependencies: v.optional(v.boolean()) }),
   'mods:checkUpdates': v.object({ instanceId: id() }),
+  'mods:update': v.object({
+    instanceId: id(),
+    fileName: v.string({ pattern: FILENAME_PATTERN }),
+    source: v.literal('modrinth', 'curseforge'),
+    projectId: v.optional(v.string({ max: 64, pattern: /^[A-Za-z0-9_-]{1,64}$/ })),
+    newVersionId: v.string({ max: 64, pattern: /^[A-Za-z0-9_-]{1,64}$/ }),
+  }),
 
   /* --- paczki --- */
   'packs:pickAndPreview': v.void(),
@@ -239,6 +246,20 @@ export const INVOKE_SCHEMAS = {
       title: v.string({ min: 1, max: 200 }),
       versionNumber: v.string({ min: 1, max: 128 }),
     }), { max: 200 }),
+  }),
+  'packBuilder:searchPacks': v.object({
+    query: v.string({ max: 200 }),
+    sources: v.array(v.literal('modrinth', 'curseforge'), { max: 2 }),
+  }),
+  'packBuilder:packVersions': v.object({
+    source: v.literal('modrinth', 'curseforge'),
+    projectId: v.string({ min: 1, max: 64, pattern: /^[A-Za-z0-9_-]+$/ }),
+  }),
+  'packBuilder:installPack': v.object({
+    source: v.literal('modrinth', 'curseforge'),
+    projectId: v.string({ min: 1, max: 64, pattern: /^[A-Za-z0-9_-]+$/ }),
+    versionId: v.string({ min: 1, max: 64, pattern: /^[A-Za-z0-9_-]+$/ }),
+    instanceName: v.string({ min: 1, max: 64 }),
   }),
 
   /* --- Java --- */

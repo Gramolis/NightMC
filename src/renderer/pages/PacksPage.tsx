@@ -1,11 +1,11 @@
 /** Import paczek: .mrpack (Modrinth) i lokalny ZIP CurseForge. */
 
 import { useState } from 'react';
-import { call, formatBytes } from '../api.js';
+import { call, formatBytes, formatNumber } from '../api.js';
 import { useStore } from '../store/useStore.js';
-import { Banner, Button, Card, Chip, Field } from '../components/UI.js';
+import { Banner, Button, Card, Chip, Field, Modal } from '../components/UI.js';
 import { IconDownload, IconPackage, IconSearch } from '../components/Icons.js';
-import type { PackBuilderItem, PackCatalogProject, PackCatalogVersion, PackPreview } from '../../shared/types.js';
+import type { Instance, PackBuilderItem, PackCatalogProject, PackCatalogVersion, PackPreview } from '../../shared/types.js';
 
 export function PacksPage() {
   const { pushToast, refreshInstances, selectInstance, setPage, instances, settings } = useStore();
@@ -27,6 +27,72 @@ export function PacksPage() {
   const [useModrinth, setUseModrinth] = useState(true);
   const [useCurseForge, setUseCurseForge] = useState(true);
   const [draft, setDraft] = useState<PackBuilderItem[]>([]);
+  const [packQuery, setPackQuery] = useState('');
+  const [packCatalog, setPackCatalog] = useState<PackCatalogProject[]>([]);
+  const [packWarnings, setPackWarnings] = useState<string[]>([]);
+  const [searchingPacks, setSearchingPacks] = useState(false);
+  const [pickingPack, setPickingPack] = useState<PackCatalogProject | null>(null);
+  const [packVersions, setPackVersions] = useState<PackCatalogVersion[]>([]);
+  const [installingPack, setInstallingPack] = useState(false);
+  const [downloadedPack, setDownloadedPack] = useState<Instance | null>(null);
+
+  const searchPacks = async () => {
+    if (!useModrinth && !useCurseForge) return;
+    setSearchingPacks(true);
+    try {
+      const result = await call<{ projects: PackCatalogProject[]; warnings: string[] }>('packBuilder:searchPacks', {
+        query: packQuery,
+        sources: [useModrinth ? 'modrinth' : null, useCurseForge ? 'curseforge' : null]
+          .filter((source): source is 'modrinth' | 'curseforge' => source !== null),
+      });
+      setPackCatalog(result.projects);
+      setPackWarnings(result.warnings);
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    } finally {
+      setSearchingPacks(false);
+    }
+  };
+
+  const openPackVersions = async (project: PackCatalogProject) => {
+    if (!project.distributable) {
+      pushToast('error', 'Autor tej paczki zablokował pobieranie przez aplikacje zewnętrzne.');
+      return;
+    }
+    setPickingPack(project);
+    setPackVersions([]);
+    try {
+      const versions = await call<PackCatalogVersion[]>('packBuilder:packVersions', {
+        source: project.source,
+        projectId: project.projectId,
+      });
+      setPackVersions(versions.filter((version) => version.downloadable));
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    }
+  };
+
+  const downloadPack = async (version: PackCatalogVersion) => {
+    if (!pickingPack) return;
+    setInstallingPack(true);
+    try {
+      const instance = await call<Instance>('packBuilder:installPack', {
+        source: pickingPack.source,
+        projectId: pickingPack.projectId,
+        versionId: version.versionId,
+        instanceName: pickingPack.title.slice(0, 64),
+      });
+      await refreshInstances();
+      selectInstance(instance.id);
+      setDownloadedPack(instance);
+      setPickingPack(null);
+      pushToast('success', `Paczka „${instance.name}” jest gotowa. Możesz teraz zarządzać jej modami.`);
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    } finally {
+      setInstallingPack(false);
+    }
+  };
 
   const searchCatalog = async () => {
     if (!builderInstance || (!useModrinth && !useCurseForge)) return;
@@ -145,8 +211,71 @@ export function PacksPage() {
       </div>
 
       <Card
-        title="Kreator mieszanej paczki (DEV)"
-        subtitle="Wyszukuj zgodne mody w Modrinth i CurseForge, a następnie dodawaj je do jednej instancji testowej."
+        title="Znajdź paczkę modów (DEV)"
+        subtitle="Przeszukaj Modrinth i CurseForge. NightMC pobierze wybraną paczkę jako osobną instancję."
+      >
+        <Field label="Nazwa paczki modów">
+          <div className="row" style={{ gap: 8 }}>
+            <input
+              className="input"
+              value={packQuery}
+              onChange={(e) => setPackQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void searchPacks(); }}
+              placeholder="np. All the Mods, Better MC, OneBlock"
+            />
+            <Button variant="primary" onClick={() => void searchPacks()} disabled={searchingPacks || (!useModrinth && !useCurseForge)}>
+              <IconSearch size={16} /> {searchingPacks ? 'Szukam…' : 'Szukaj paczek'}
+            </Button>
+          </div>
+        </Field>
+
+        <div className="row wrap" style={{ gap: 14, marginBottom: 16 }}>
+          <label className="row" style={{ gap: 7 }}><input type="checkbox" checked={useModrinth} onChange={(e) => setUseModrinth(e.target.checked)} /> Modrinth</label>
+          <label className="row" style={{ gap: 7 }}><input type="checkbox" checked={useCurseForge} onChange={(e) => setUseCurseForge(e.target.checked)} /> CurseForge</label>
+          {!settings?.curseforgeKeySet && <Chip tone="warn">CurseForge wymaga własnego klucza w Ustawieniach</Chip>}
+        </div>
+
+        {packWarnings.map((warning) => <div key={warning} style={{ marginBottom: 10 }}><Banner>{warning}</Banner></div>)}
+
+        {downloadedPack && (
+          <div className="pack-ready-panel">
+            <div>
+              <div className="list-title">{downloadedPack.name} jest gotowa</div>
+              <div className="list-sub">Minecraft {downloadedPack.mcVersion} · {downloadedPack.loader} · {downloadedPack.modCount} modów</div>
+            </div>
+            <Button variant="primary" onClick={() => { selectInstance(downloadedPack.id); setPage('mods'); }}>
+              Otwórz mody paczki
+            </Button>
+          </div>
+        )}
+
+        {packCatalog.length > 0 && (
+          <div className="pack-catalog-grid">
+            {packCatalog.map((project) => (
+              <div className="pack-catalog-card" key={`${project.source}:${project.projectId}`}>
+                {project.iconUrl ? <img src={project.iconUrl} alt="" className="pack-catalog-icon" /> : <div className="pack-catalog-icon placeholder" />}
+                <div className="pack-catalog-body">
+                  <div className="row wrap" style={{ gap: 6 }}>
+                    <span className="list-title">{project.title}</span>
+                    <Chip tone={project.source === 'modrinth' ? 'cyan' : 'warn'}>{project.source === 'modrinth' ? 'Modrinth' : 'CurseForge'}</Chip>
+                  </div>
+                  <div className="list-sub pack-catalog-description">{project.description}</div>
+                  <div className="list-sub">{project.author ? `Autor: ${project.author} · ` : ''}{formatNumber(project.downloads)} pobrań</div>
+                </div>
+                <Button small variant="primary" disabled={!project.distributable} onClick={() => void openPackVersions(project)}>
+                  <IconDownload size={14} /> Pobierz
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <div style={{ height: 18 }} />
+
+      <Card
+        title="Własna mieszana paczka (DEV)"
+        subtitle="Wybierz istniejącą instancję i dodawaj do niej pojedyncze mody z Modrinth oraz CurseForge."
       >
         {moddedInstances.length === 0 ? (
           <Banner kind="info">Najpierw utwórz instancję Fabric, Forge albo NeoForge.</Banner>
@@ -158,7 +287,7 @@ export function PacksPage() {
                   {moddedInstances.map((i) => <option key={i.id} value={i.id}>{i.name} — Minecraft {i.mcVersion} / {i.loader}</option>)}
                 </select>
               </Field>
-              <Field label="Szukaj moda">
+              <Field label="Dodaj mod do wybranej paczki">
                 <div className="row" style={{ gap: 8 }}>
                   <input
                     className="input"
@@ -315,6 +444,33 @@ export function PacksPage() {
           </Card>
         )}
       </div>
+
+      {pickingPack && (
+        <Modal title={`Wersje paczki: ${pickingPack.title}`} onClose={() => !installingPack && setPickingPack(null)} wide>
+          {packVersions.length === 0 ? (
+            <Banner kind="info">Brak wersji paczki możliwych do pobrania.</Banner>
+          ) : (
+            <div className="list" style={{ maxHeight: '54vh', overflowY: 'auto' }}>
+              {packVersions.map((version) => (
+                <div className="list-item" key={version.versionId}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="list-title">{version.name}</div>
+                    <div className="list-sub">
+                      {version.versionNumber} · MC {version.gameVersions.slice(0, 5).join(', ') || 'z manifestu'}
+                      {version.loaders.length ? ` · ${version.loaders.join(', ')}` : ''}
+                      {version.size ? ` · ${formatBytes(version.size)}` : ''}
+                    </div>
+                  </div>
+                  <Chip tone={version.releaseType === 'release' ? 'ok' : 'warn'}>{version.releaseType}</Chip>
+                  <Button small variant="primary" disabled={installingPack} onClick={() => void downloadPack(version)}>
+                    <IconDownload size={14} /> {installingPack ? 'Pobieram…' : 'Pobierz paczkę'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

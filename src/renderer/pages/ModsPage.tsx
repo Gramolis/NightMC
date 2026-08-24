@@ -5,20 +5,29 @@ import { call, formatBytes, formatNumber } from '../api.js';
 import { useSelectedInstance, useStore } from '../store/useStore.js';
 import { Banner, Button, Card, Chip, Empty, Modal } from '../components/UI.js';
 import { IconDownload, IconPuzzle, IconRefresh, IconSearch, IconTrash } from '../components/Icons.js';
-import type { ModFile, ModrinthProject, ModrinthSearchResult, ModrinthVersion } from '../../shared/types.js';
+import type { ModFile, PackCatalogProject, PackCatalogVersion } from '../../shared/types.js';
 
 export function ModsPage() {
   const instance = useSelectedInstance();
-  const { instances, selectInstance, pushToast, setPage } = useStore();
+  const { instances, selectInstance, pushToast, setPage, settings } = useStore();
   const [tab, setTab] = useState<'installed' | 'browse'>('installed');
   const [mods, setMods] = useState<ModFile[]>([]);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ModrinthProject[]>([]);
+  const [results, setResults] = useState<PackCatalogProject[]>([]);
   const [searching, setSearching] = useState(false);
-  const [picking, setPicking] = useState<ModrinthProject | null>(null);
-  const [versions, setVersions] = useState<ModrinthVersion[]>([]);
+  const [picking, setPicking] = useState<PackCatalogProject | null>(null);
+  const [versions, setVersions] = useState<PackCatalogVersion[]>([]);
+  const [useModrinth, setUseModrinth] = useState(true);
+  const [useCurseForge, setUseCurseForge] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [updates, setUpdates] = useState<{ fileName: string; currentName: string; newVersionId: string; newVersionNumber: string }[]>([]);
+  const [updates, setUpdates] = useState<{
+    fileName: string;
+    currentName: string;
+    newVersionId: string;
+    newVersionNumber: string;
+    source: 'modrinth' | 'curseforge';
+    projectId?: string;
+  }[]>([]);
 
   const loadMods = async () => {
     if (!instance) return;
@@ -35,13 +44,16 @@ export function ModsPage() {
     if (!instance) return;
     setSearching(true);
     try {
-      const res = await call<ModrinthSearchResult>('mods:search', {
+      if (instance.loader === 'vanilla') throw new Error('Wybierz instancję Fabric, Forge albo NeoForge.');
+      const res = await call<{ projects: PackCatalogProject[]; warnings: string[] }>('packBuilder:search', {
         query,
         mcVersion: instance.mcVersion,
-        loader: instance.loader === 'vanilla' ? undefined : instance.loader,
-        limit: 30,
+        loader: instance.loader,
+        sources: [useModrinth ? 'modrinth' : null, useCurseForge ? 'curseforge' : null]
+          .filter((source): source is 'modrinth' | 'curseforge' => source !== null),
       });
-      setResults(res.hits);
+      setResults(res.projects);
+      for (const warning of res.warnings) pushToast('info', warning);
     } catch (e) {
       pushToast('error', (e as Error).message);
     } finally {
@@ -54,16 +66,17 @@ export function ModsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, instance?.id]);
 
-  const openVersions = async (project: ModrinthProject) => {
+  const openVersions = async (project: PackCatalogProject) => {
     if (!instance) return;
     setPicking(project);
     setVersions([]);
     try {
       setVersions(
-        await call<ModrinthVersion[]>('mods:versions', {
-          projectId: project.project_id,
+        await call<PackCatalogVersion[]>('packBuilder:versions', {
+          source: project.source,
+          projectId: project.projectId,
           mcVersion: instance.mcVersion,
-          loader: instance.loader === 'vanilla' ? undefined : instance.loader,
+          loader: instance.loader as 'fabric' | 'forge' | 'neoforge',
         }),
       );
     } catch (e) {
@@ -71,18 +84,45 @@ export function ModsPage() {
     }
   };
 
-  const install = async (versionId: string) => {
+  const install = async (version: PackCatalogVersion) => {
+    if (!instance || !picking) return;
+    setBusy(true);
+    try {
+      const res = await call<{ installed: string[]; skipped: string[] }>('packBuilder:install', {
+        instanceId: instance.id,
+        items: [{
+          source: picking.source,
+          projectId: picking.projectId,
+          versionId: version.versionId,
+          title: picking.title,
+          versionNumber: version.versionNumber,
+        }],
+      });
+      pushToast('success', `Zainstalowano ${res.installed.length} plików.`);
+      for (const reason of res.skipped) pushToast('error', `Pominięto: ${reason}`);
+      setPicking(null);
+      await loadMods();
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateInstalled = async (update: typeof updates[number]) => {
     if (!instance) return;
     setBusy(true);
     try {
-      const res = await call<{ installed: { name: string }[]; skipped: { name: string; reason: string }[] }>(
-        'mods:install',
-        { instanceId: instance.id, versionId, withDependencies: true },
-      );
-      pushToast('success', `Zainstalowano ${res.installed.length} plików.`);
-      for (const s of res.skipped) pushToast('error', `Pominięto ${s.name}: ${s.reason}`);
-      setPicking(null);
-      await loadMods();
+      const next = await call<ModFile[]>('mods:update', {
+        instanceId: instance.id,
+        fileName: update.fileName,
+        source: update.source,
+        projectId: update.projectId,
+        newVersionId: update.newVersionId,
+      });
+      setMods(next);
+      setUpdates((current) => current.filter((item) => item.fileName !== update.fileName));
+      pushToast('success', 'Mod został zaktualizowany, a stara wersja usunięta.');
     } catch (e) {
       pushToast('error', (e as Error).message);
     } finally {
@@ -100,8 +140,8 @@ export function ModsPage() {
         <div>
           <h1 className="page-title">Mody</h1>
           <p className="page-sub">
-            Katalog Modrinth. Dostęp do modów nie zależy od typu profilu — działa tak samo dla konta Premium
-            i profilu Offline / Non-Premium.
+            Zarządzaj modami paczki i dodawaj zgodne pliki z Modrinth oraz CurseForge. Dostęp nie zależy
+            od typu profilu gracza.
           </p>
         </div>
         <div className="spacer" />
@@ -123,7 +163,7 @@ export function ModsPage() {
           Zainstalowane ({mods.length})
         </button>
         <button className={`tab${tab === 'browse' ? ' active' : ''}`} onClick={() => setTab('browse')}>
-          Przeglądaj Modrinth
+          Dodaj mody
         </button>
       </div>
 
@@ -153,7 +193,7 @@ export function ModsPage() {
           }
         >
           {mods.length === 0 ? (
-            <Empty title="Brak modów" hint="Przejdź do zakładki „Przeglądaj Modrinth”, żeby dodać pierwszy mod." />
+            <Empty title="Brak modów" hint="Przejdź do zakładki „Dodaj mody”, żeby dodać pierwszy mod." />
           ) : (
             <div className="list">
               {mods.map((mod) => {
@@ -164,10 +204,12 @@ export function ModsPage() {
                       <div className="list-title">{mod.displayName}</div>
                       <div className="list-sub">{mod.fileName} · {formatBytes(mod.size)}</div>
                     </div>
+                    {mod.projectId?.startsWith('curseforge:') && <Chip tone="warn">CurseForge</Chip>}
+                    {mod.projectId && !mod.projectId.startsWith('curseforge:') && <Chip tone="cyan">Modrinth</Chip>}
                     {upd && <Chip tone="cyan">aktualizacja {upd.newVersionNumber}</Chip>}
                     {!mod.enabled && <Chip tone="dim">wyłączony</Chip>}
                     {upd && (
-                      <Button small variant="primary" disabled={busy} onClick={() => void install(upd.newVersionId)}>
+                      <Button small variant="primary" disabled={busy} onClick={() => void updateInstalled(upd)}>
                         Aktualizuj
                       </Button>
                     )}
@@ -209,7 +251,13 @@ export function ModsPage() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void search()}
             />
-            <Button onClick={() => void search()} disabled={searching}>Szukaj</Button>
+            <Button onClick={() => void search()} disabled={searching || (!useModrinth && !useCurseForge)}>Szukaj</Button>
+          </div>
+
+          <div className="row wrap" style={{ gap: 14, marginBottom: 14 }}>
+            <label className="row" style={{ gap: 7 }}><input type="checkbox" checked={useModrinth} onChange={(e) => setUseModrinth(e.target.checked)} /> Modrinth</label>
+            <label className="row" style={{ gap: 7 }}><input type="checkbox" checked={useCurseForge} onChange={(e) => setUseCurseForge(e.target.checked)} /> CurseForge</label>
+            {!settings?.curseforgeKeySet && <Chip tone="warn">CurseForge wymaga klucza w Ustawieniach</Chip>}
           </div>
 
           {searching ? (
@@ -219,8 +267,8 @@ export function ModsPage() {
           ) : (
             <div className="list" style={{ maxHeight: 'calc(100vh - 340px)', overflowY: 'auto' }}>
               {results.map((p) => (
-                <div key={p.project_id} className="list-item">
-                  {p.icon_url ? <img className="mod-icon" src={p.icon_url} alt="" /> : <div className="mod-icon" />}
+                <div key={`${p.source}:${p.projectId}`} className="list-item">
+                  {p.iconUrl ? <img className="mod-icon" src={p.iconUrl} alt="" /> : <div className="mod-icon" />}
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div className="list-title">{p.title}</div>
                     <div className="list-sub" style={{ marginTop: 3 }}>{p.description}</div>
@@ -228,7 +276,8 @@ export function ModsPage() {
                       {p.author} · {formatNumber(p.downloads)} pobrań
                     </div>
                   </div>
-                  <Button small onClick={() => void openVersions(p)}><IconDownload size={14} /> Wersje</Button>
+                  <Chip tone={p.source === 'modrinth' ? 'cyan' : 'warn'}>{p.source === 'modrinth' ? 'Modrinth' : 'CurseForge'}</Chip>
+                  <Button small disabled={!p.distributable} onClick={() => void openVersions(p)}><IconDownload size={14} /> Wersje</Button>
                 </div>
               ))}
               {results.length === 0 && <Empty title="Brak wyników" hint="Spróbuj innej frazy albo zmień wersję instancji." />}
@@ -244,15 +293,15 @@ export function ModsPage() {
           ) : (
             <div className="list" style={{ maxHeight: '52vh', overflowY: 'auto' }}>
               {versions.map((v) => (
-                <div key={v.id} className="list-item">
+                <div key={v.versionId} className="list-item">
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div className="list-title">{v.name}</div>
                     <div className="list-sub">
-                      {v.version_number} · {v.loaders.join(', ')} · MC {v.game_versions.slice(-4).join(', ')}
+                      {v.versionNumber} · {v.loaders.join(', ')} · MC {v.gameVersions.slice(-4).join(', ')}
                     </div>
                   </div>
-                  <Chip tone={v.version_type === 'release' ? 'ok' : 'warn'}>{v.version_type}</Chip>
-                  <Button small variant="primary" disabled={busy} onClick={() => void install(v.id)}>Instaluj</Button>
+                  <Chip tone={v.releaseType === 'release' ? 'ok' : 'warn'}>{v.releaseType}</Chip>
+                  <Button small variant="primary" disabled={busy || !v.downloadable} onClick={() => void install(v)}>Instaluj</Button>
                 </div>
               ))}
             </div>
