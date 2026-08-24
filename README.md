@@ -158,9 +158,13 @@ NightMC odpytuje `https://api.github.com/repos/<repo>/releases/latest` i szuka w
 
 | Plik | Rola |
 |---|---|
-| `NightMC.exe` | właściwa aktualizacja |
-| `NightMC.exe.sha256` | suma kontrolna (**wymagana**) |
-| `NightMC.exe.sig` | podpis Ed25519 (opcjonalny) |
+| `NightMC-Setup.exe` | instalator i właściwa aktualizacja |
+| `NightMC-Setup.exe.sha256` | suma kontrolna (**wymagana**) |
+| `NightMC-Setup.exe.sig` | podpis Ed25519 (opcjonalny) |
+
+Publiczne wydania nie zawierają już przenośnego `NightMC.exe`. Nowy użytkownik pobiera instalator,
+a kolejne wersje NightMC pobiera z poziomu launchera i po weryfikacji pokazuje instalator do uruchomienia.
+Starsze wydania z `NightMC.exe` pozostają obsługiwane awaryjnie.
 
 Aby włączyć weryfikację podpisu:
 
@@ -345,8 +349,8 @@ git push origin main --tags
 Workflow `.github/workflows/release.yml` uruchomi się po tagu `v*.*.*` i wykona:
 
 1. checkout, 2. Node.js, 3. `npm ci`, 4. lint, 5. typecheck, 6. testy, 7. build,
-8. utworzenie `NightMC.exe`, 9. opcjonalne podpisanie, 10. wygenerowanie SHA-256,
-11. utworzenie GitHub Release, 12. dodanie EXE i checksumy.
+8. utworzenie `NightMC-Setup.exe`, 9. opcjonalne podpisanie, 10. wygenerowanie SHA-256,
+11. utworzenie GitHub Release, 12. dodanie instalatora, checksumy i opcjonalnego podpisu.
 
 Sekrety są przekazywane wyłącznie przez `env` i nie pojawiają się w logach.
 

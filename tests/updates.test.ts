@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'node:crypto';
-import { compareVersions, verifySignature } from '../src/main/updates.js';
+import { compareVersions, selectUpdateAssets, verifySignature } from '../src/main/updates.js';
 import { parseNews, sanitizeUrl } from '../src/main/news.js';
 
 describe('porównywanie wersji', () => {
@@ -23,6 +23,31 @@ describe('porównywanie wersji', () => {
   it('radzi sobie z różną liczbą członów', () => {
     expect(compareVersions('1.1', '1.1.0')).toBe(0);
     expect(compareVersions('1.2', '1.1.9')).toBeGreaterThan(0);
+  });
+});
+
+describe('pliki wydania aktualizacji', () => {
+  const asset = (name: string) => ({ name, browser_download_url: `https://example.com/${name}`, size: 123 });
+
+  it('preferuje instalator wraz z jego sumą i podpisem', () => {
+    const selected = selectUpdateAssets([
+      asset('NightMC.exe'),
+      asset('NightMC.exe.sha256'),
+      asset('NightMC-Setup.exe'),
+      asset('NightMC-Setup.exe.sha256'),
+      asset('NightMC-Setup.exe.sig'),
+    ]);
+    expect(selected.executable?.name).toBe('NightMC-Setup.exe');
+    expect(selected.checksum?.name).toBe('NightMC-Setup.exe.sha256');
+    expect(selected.signature?.name).toBe('NightMC-Setup.exe.sig');
+    expect(selected.assetType).toBe('installer');
+  });
+
+  it('obsługuje portable ze starszych wydań jako wariant awaryjny', () => {
+    const selected = selectUpdateAssets([asset('NightMC.exe'), asset('NightMC.exe.sha256')]);
+    expect(selected.executable?.name).toBe('NightMC.exe');
+    expect(selected.checksum?.name).toBe('NightMC.exe.sha256');
+    expect(selected.assetType).toBe('portable');
   });
 });
 

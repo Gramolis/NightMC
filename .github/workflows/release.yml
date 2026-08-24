@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build NightMC.exe (Windows x64)
+    name: Build NightMC Setup (Windows x64)
     runs-on: windows-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
       - name: Generate icon
         run: npm run icon
 
-      - name: Build NightMC.exe
+      - name: Build NightMC Setup
         env:
           NIGHTMC_MS_CLIENT_ID: ${{ vars.NIGHTMC_MS_CLIENT_ID }}
           NIGHTMC_UPDATE_REPO: ${{ github.repository }}
@@ -48,39 +48,38 @@ jobs:
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        run: npm run build:exe
+        run: npm run build:nsis
 
       - name: Verify artifact exists
         shell: pwsh
         run: |
-          if (-not (Test-Path 'dist/NightMC.exe')) {
-            Write-Error 'Brak dist/NightMC.exe - build nie powiódł się'
+          if (-not (Test-Path 'dist/NightMC-Setup.exe')) {
+            Write-Error 'Brak dist/NightMC-Setup.exe - build nie powiódł się'
             exit 1
           }
-          Get-Item dist/NightMC.exe | Format-List Name, Length
+          Get-Item dist/NightMC-Setup.exe | Format-List Name, Length
 
       - name: Generate SHA-256
         shell: pwsh
         run: |
-          $hash = (Get-FileHash -Algorithm SHA256 dist/NightMC.exe).Hash.ToLower()
-          "$hash  NightMC.exe" | Out-File -Encoding ascii -NoNewline dist/NightMC.exe.sha256
+          $hash = (Get-FileHash -Algorithm SHA256 dist/NightMC-Setup.exe).Hash.ToLower()
+          "$hash  NightMC-Setup.exe" | Out-File -Encoding ascii -NoNewline dist/NightMC-Setup.exe.sha256
           Write-Host "SHA-256: $hash"
 
       - name: Sign update manifest (optional)
         if: ${{ env.NIGHTMC_UPDATE_PRIVKEY != '' }}
         env:
           NIGHTMC_UPDATE_PRIVKEY: ${{ secrets.NIGHTMC_UPDATE_PRIVKEY }}
-        run: node scripts/sign-update.mjs dist/NightMC.exe
+        run: node scripts/sign-update.mjs dist/NightMC-Setup.exe
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: NightMC-windows-x64
           path: |
-            dist/NightMC.exe
-            dist/NightMC.exe.sha256
-            dist/NightMC.exe.sig
             dist/NightMC-Setup.exe
+            dist/NightMC-Setup.exe.sha256
+            dist/NightMC-Setup.exe.sig
           if-no-files-found: warn
 
       - name: Create GitHub Release
@@ -92,7 +91,6 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            dist/NightMC.exe
-            dist/NightMC.exe.sha256
-            dist/NightMC.exe.sig
             dist/NightMC-Setup.exe
+            dist/NightMC-Setup.exe.sha256
+            dist/NightMC-Setup.exe.sig

@@ -4,13 +4,14 @@
  * Zasady bezpieczeństwa:
  *  - pobieramy tylko po HTTPS z api.github.com / objects.githubusercontent.com,
  *  - plik ląduje w katalogu tymczasowym,
- *  - weryfikujemy SHA-256 z pliku `NightMC.exe.sha256` dołączonego do release'u,
+ *  - preferujemy instalator `NightMC-Setup.exe` i weryfikujemy jego SHA-256,
+ *  - starsze wydania z portable `NightMC.exe` pozostają obsługiwane awaryjnie,
  *  - opcjonalnie weryfikujemy podpis Ed25519 (w EXE jest TYLKO klucz publiczny),
  *  - użytkownik zatwierdza aktualizację ręcznie,
  *  - NightMC NIGDY nie wykonuje skryptu pobranego z sieci.
  *
- * Portable EXE nie może bezpiecznie podmienić samego siebie w trakcie działania,
- * dlatego po weryfikacji otwieramy katalog z nowym plikiem.
+ * Po weryfikacji otwieramy katalog z instalatorem. Użytkownik nadal sam zatwierdza
+ * jego uruchomienie, więc pobrany plik nigdy nie wykonuje się bez wiedzy gracza.
  */
 
 import fsp from 'node:fs/promises';
@@ -29,10 +30,32 @@ export const UPDATE_REPO = process.env.NIGHTMC_UPDATE_REPO ?? '';
 /** Publiczny klucz Ed25519 w base64. Klucz prywatny NIGDY nie trafia do EXE. */
 export const UPDATE_PUBKEY = process.env.NIGHTMC_UPDATE_PUBKEY ?? '';
 
-interface GhAsset {
+export interface GhAsset {
   name: string;
   browser_download_url: string;
   size: number;
+}
+
+export interface SelectedUpdateAssets {
+  executable?: GhAsset;
+  checksum?: GhAsset;
+  signature?: GhAsset;
+  assetType?: 'installer' | 'portable';
+}
+
+/** Preferuje instalator; portable obsługuje tylko starsze wydania. */
+export function selectUpdateAssets(assets: GhAsset[]): SelectedUpdateAssets {
+  const installer = assets.find((asset) => asset.name.toLowerCase() === 'nightmc-setup.exe');
+  const portable = assets.find((asset) => asset.name.toLowerCase() === 'nightmc.exe');
+  const executable = installer ?? portable;
+  if (!executable) return {};
+  const base = executable.name.toLowerCase();
+  return {
+    executable,
+    checksum: assets.find((asset) => asset.name.toLowerCase() === `${base}.sha256`),
+    signature: assets.find((asset) => asset.name.toLowerCase() === `${base}.sig`),
+    assetType: installer ? 'installer' : 'portable',
+  };
 }
 
 interface GhRelease {
@@ -82,27 +105,33 @@ export async function checkForUpdate(currentVersion = app?.getVersion?.() ?? '1.
     if (!release || release.draft) return { available: false, currentVersion };
 
     const latest = release.tag_name.replace(/^v/i, '');
-    const exe = release.assets.find((a) => a.name.toLowerCase() === 'nightmc.exe');
-    const shaAsset = release.assets.find((a) => /nightmc\.exe\.sha256$/i.test(a.name));
-    const sigAsset = release.assets.find((a) => /nightmc\.exe\.sig$/i.test(a.name));
+    const selected = selectUpdateAssets(release.assets);
 
     let sha256: string | undefined;
-    if (shaAsset) {
-      const text = (await downloadToBuffer(shaAsset.browser_download_url, { maxBytes: 4096 })).toString('utf8');
+    if (selected.checksum) {
+      const text = (await downloadToBuffer(selected.checksum.browser_download_url, { maxBytes: 4096 })).toString('utf8');
       sha256 = text.trim().split(/\s+/)[0]?.toLowerCase();
+      if (!/^[a-f0-9]{64}$/.test(sha256 ?? '')) sha256 = undefined;
     }
     let signature: string | undefined;
-    if (sigAsset) {
-      signature = (await downloadToBuffer(sigAsset.browser_download_url, { maxBytes: 4096 })).toString('utf8').trim();
+    if (selected.signature) {
+      signature = (await downloadToBuffer(selected.signature.browser_download_url, { maxBytes: 4096 })).toString('utf8').trim();
+    }
+
+    const completeUpdate = Boolean(selected.executable && sha256);
+    if (compareVersions(latest, currentVersion) > 0 && !completeUpdate) {
+      log.warn(`Wydanie ${latest} nie zawiera kompletnego instalatora aktualizacji i sumy SHA-256.`);
     }
 
     return {
-      available: compareVersions(latest, currentVersion) > 0 && Boolean(exe),
+      available: compareVersions(latest, currentVersion) > 0 && completeUpdate,
       currentVersion,
       latestVersion: latest,
       changelog: release.body?.slice(0, 20_000),
-      exeUrl: exe?.browser_download_url,
-      size: exe?.size,
+      downloadUrl: selected.executable?.browser_download_url,
+      fileName: selected.executable?.name,
+      assetType: selected.assetType,
+      size: selected.executable?.size,
       sha256,
       signature,
       publishedAt: release.published_at,
@@ -144,19 +173,23 @@ export async function downloadUpdate(
   info: UpdateInfo,
   onProgress?: (p: DownloadProgress) => void,
 ): Promise<DownloadedUpdate> {
-  if (!info.exeUrl) throw new Error('Wydanie nie zawiera pliku NightMC.exe');
+  if (!info.downloadUrl) throw new Error('Wydanie nie zawiera instalatora NightMC.');
+  if (!info.sha256) throw new Error('Wydanie nie zawiera wymaganej sumy SHA-256 instalatora.');
 
-  const dest = path.join(tempDir(), `NightMC-${info.latestVersion ?? 'new'}.exe`);
+  const targetName = info.assetType === 'portable'
+    ? `NightMC-${info.latestVersion ?? 'new'}.exe`
+    : `NightMC-Setup-${info.latestVersion ?? 'new'}.exe`;
+  const dest = path.join(tempDir(), targetName);
   await fsp.mkdir(tempDir(), { recursive: true });
 
   const queue = new DownloadQueue({ concurrency: 1, onProgress, phase: 'Pobieranie aktualizacji NightMC' });
   queue.add({
     id: 'update',
-    url: info.exeUrl,
+    url: info.downloadUrl,
     dest,
     size: info.size,
     sha256: info.sha256,
-    label: `NightMC ${info.latestVersion}`,
+    label: info.fileName ?? `NightMC ${info.latestVersion}`,
   });
   const res = await queue.run();
   if (!res.ok) {
@@ -183,7 +216,7 @@ export async function downloadUpdate(
   return { file: dest, sha256: actual, signatureValid };
 }
 
-/** Pokazuje pobrany plik w Eksploratorze - użytkownik podmienia EXE ręcznie. */
+/** Pokazuje zweryfikowany instalator w Eksploratorze; uruchomienie zatwierdza użytkownik. */
 export function revealUpdate(file: string): void {
   shell.showItemInFolder(file);
 }

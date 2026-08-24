@@ -14,6 +14,10 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 - Wykrywanie duplikatów, złego loadera, brakujących lub niezgodnych zależności, konfliktów, uszkodzonych JAR-ów i podejrzanych archiwów.
 - Panel „Sprawdź mody” w zakładce modów z podsumowaniem błędów, ostrzeżeń i sugerowanymi rozwiązaniami.
 
+### Zmieniono
+
+- Publiczne wydania zawierają teraz instalator zamiast przenośnego EXE, a aktualizator NightMC pobiera i weryfikuje instalator kolejnej wersji.
+
 ### Naprawiono
 
 - Wartości RAM poniżej rekomendacji nie są już błędnie opisywane jako „Powyżej rekomendacji”.

@@ -459,7 +459,9 @@ export interface UpdateInfo {
   currentVersion: string;
   latestVersion?: string;
   changelog?: string;
-  exeUrl?: string;
+  downloadUrl?: string;
+  fileName?: string;
+  assetType?: 'installer' | 'portable';
   sha256?: string;
   size?: number;
   publishedAt?: string;

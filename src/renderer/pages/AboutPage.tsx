@@ -130,9 +130,9 @@ export function AboutPage() {
 
             <div style={{ marginTop: 16 }}>
               <Banner kind="info">
-                Plik jest pobierany po HTTPS do katalogu tymczasowego i weryfikowany sumą SHA-256
-                (oraz podpisem Ed25519, jeśli wydanie go zawiera). Portable EXE nie podmienia sam siebie
-                w trakcie działania — po weryfikacji NightMC otworzy katalog z nowym plikiem.
+                Instalator jest pobierany po HTTPS do katalogu tymczasowego i weryfikowany sumą SHA-256
+                (oraz podpisem Ed25519, jeśli wydanie go zawiera). Po weryfikacji NightMC otworzy katalog
+                z bezpiecznym instalatorem — jego uruchomienie nadal zatwierdzasz samodzielnie.
               </Banner>
             </div>
           </Card>
