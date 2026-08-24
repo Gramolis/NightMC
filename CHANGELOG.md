@@ -9,7 +9,7 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ### Dodano
 
-- Animowane intro uruchamiane natychmiast z NightMC, napisem „Made by Krzychu” i płynnym odsłonięciem gotowego menu.
+- Dodano intro.
 - Procentowy postęp pobierania wybranej wersji paczki wraz z rozmiarem, prędkością i przewidywanym czasem zakończenia.
 - Dynamiczną czerwoną strefę suwaka RAM powyżej bezpiecznego maksimum komputera; wartości z tej strefy nie mogą zostać zapisane.
 - Diagnostykę lokalnych modów odczytującą bez uruchamiania kodu metadane Fabric, Forge, NeoForge, Quilt i starszego Forge.
@@ -23,7 +23,6 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ### Naprawiono
 
-- Dolna część napisu „NightMC” w intro nie jest już przycinana, a „Made by Krzychu” uderza w jego górną krawędź zamiast nachodzić na litery.
 - Wartości RAM poniżej rekomendacji nie są już błędnie opisywane jako „Powyżej rekomendacji”.
 
 ## [1.0.3] — 2026-08-24
