@@ -9,6 +9,7 @@ import {
   loaderFromMrpackDeps,
   parseCurseForgeManifest,
   parseMrpackIndex,
+  parsePackLock,
   PackError,
   previewCurseForge,
   previewMrpack,
@@ -170,5 +171,32 @@ describe('CurseForge', () => {
     expect(preview.requiredFiles).toHaveLength(2);
     expect(preview.overrideCount).toBe(1);
     expect(preview.warnings.join(' ')).toContain('klucza API');
+  });
+});
+
+describe('manifest naprawczy paczki', () => {
+  it('akceptuje bezpieczne referencje obu źródeł', () => {
+    const lock = parsePackLock({
+      format: 'nightmc-pack-lock',
+      formatVersion: 1,
+      kind: 'mrpack',
+      name: 'Test',
+      files: [
+        { source: 'download', path: 'mods/a.jar', downloads: ['https://cdn.modrinth.com/a.jar'], size: 12, sha1: 'a'.repeat(40) },
+        { source: 'curseforge', projectID: 123, fileID: 456 },
+      ],
+    });
+    expect(lock?.files).toHaveLength(2);
+  });
+
+  it('odrzuca ścieżki wychodzące z instancji i błędne identyfikatory', () => {
+    expect(() => parsePackLock({
+      format: 'nightmc-pack-lock', formatVersion: 1, kind: 'mrpack', name: 'X',
+      files: [{ source: 'download', path: '../../evil.jar', downloads: [] }],
+    })).toThrow(UnsafeArchiveError);
+    expect(parsePackLock({
+      format: 'nightmc-pack-lock', formatVersion: 1, kind: 'curseforge', name: 'X',
+      files: [{ source: 'curseforge', projectID: -1, fileID: 2 }],
+    })).toBeNull();
   });
 });

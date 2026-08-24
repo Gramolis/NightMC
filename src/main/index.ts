@@ -51,7 +51,7 @@ import { AuthError, getValidSession, isAuthConfigured, loginMicrosoft, refreshAc
 import { offlineSession } from './offline.js';
 import { addServer, getServer, listServers, pingServer, removeServer, updateServer } from './servers.js';
 import { checkModUpdates, deleteMod, installMod, listMods, projectVersions, searchMods, toggleMod } from './mods.js';
-import { exportMrpack, importPack, previewPack, setManualFile } from './packs.js';
+import { exportMrpack, importPack, previewPack, repairPackFiles, setManualFile } from './packs.js';
 import { installPackBuilderItems, packCatalogVersions, searchPackCatalog } from './pack-builder.js';
 import { launchGame, setLauncherVersion, stopAll, stopGame, runningGames } from './launcher.js';
 import { checkForUpdate, downloadUpdate, revealUpdate } from './updates.js';
@@ -392,9 +392,10 @@ function registerHandlers(): void {
     const s = getSettings();
     setGameState({ status: 'preparing', instanceId: id, progress: emptyProgress('Naprawa') });
     try {
-      const res = await repairInstance(id, { onProgress: emitProgress, concurrency: s.concurrency });
-      toast('success', `Naprawiono ${res.repaired} plików.`);
-      return res;
+      const core = await repairInstance(id, { onProgress: emitProgress, concurrency: s.concurrency });
+      const pack = await repairPackFiles(id, emitProgress);
+      emit('event:instances-changed', null);
+      return { repaired: core.repaired + pack.repaired, coreRepaired: core.repaired, pack };
     } finally {
       setGameState({ status: 'idle' });
     }

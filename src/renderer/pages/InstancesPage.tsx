@@ -28,6 +28,29 @@ export function InstancesPage() {
     }
   };
 
+  const repair = async (inst: Instance) => {
+    setBusy(true);
+    try {
+      const result = await call<{
+        repaired: number;
+        coreRepaired: number;
+        pack: { manifestFound: boolean; checked: number; repaired: number; missing: number; warnings: string[] };
+      }>('instances:repair', { id: inst.id });
+      await refreshInstances();
+      let message = `Sprawdzono pliki gry. Naprawiono ${result.repaired}.`;
+      if (result.pack.manifestFound) {
+        message += ` Paczka: sprawdzono ${result.pack.checked}, brakujących ${result.pack.missing}.`;
+      } else if ((inst.modCount ?? 0) > 0) {
+        message += ' Ta starsza instancja nie ma jeszcze manifestu naprawczego paczki.';
+      }
+      pushToast(result.pack.missing > 0 ? 'info' : 'success', message);
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (instances.length === 0) {
     return (
       <Empty
@@ -101,9 +124,9 @@ export function InstancesPage() {
                 variant="ghost"
                 title="Napraw pliki"
                 disabled={busy}
-                onClick={() => void act(() => call('instances:repair', { id: inst.id }), 'Instancja naprawiona.')}
+                onClick={() => void repair(inst)}
               >
-                <IconRefresh size={14} />
+                <IconRefresh size={14} /> Napraw
               </Button>
               <Button small variant="danger" onClick={() => setDeleting(inst)}><IconTrash size={14} /></Button>
             </div>

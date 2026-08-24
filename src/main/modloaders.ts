@@ -246,6 +246,40 @@ export interface ForgeInstallContext {
   onProgress?: (p: DownloadProgress) => void;
 }
 
+/**
+ * Instalatory Forge/NeoForge zawierają część artefaktów bezpośrednio w
+ * katalogu `maven/`. Mają pusty URL, więc nie da się ich dociągnąć z kolejki.
+ */
+export async function copyEmbeddedMavenFiles(installerRoot: string, targetRoot: string): Promise<number> {
+  const sourceRoot = path.join(installerRoot, 'maven');
+  let copied = 0;
+
+  const visit = async (source: string, relative = ''): Promise<void> => {
+    let entries: fs.Dirent[];
+    try {
+      entries = await fsp.readdir(source, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) throw new LoaderError('Instalator modloadera zawiera niedozwolone dowiązanie symboliczne.');
+      const rel = path.join(relative, entry.name);
+      const src = path.join(source, entry.name);
+      if (entry.isDirectory()) {
+        await visit(src, rel);
+      } else if (entry.isFile()) {
+        const dest = path.join(targetRoot, rel);
+        await fsp.mkdir(path.dirname(dest), { recursive: true });
+        await fsp.copyFile(src, dest);
+        copied++;
+      }
+    }
+  };
+
+  await visit(sourceRoot);
+  return copied;
+}
+
 export async function installForgeLike(ctx: ForgeInstallContext): Promise<VersionJson> {
   const { loader, loaderVersion } = ctx;
   const { name, base } = installerCoords(loader, loaderVersion);
@@ -268,6 +302,11 @@ export async function installForgeLike(ctx: ForgeInstallContext): Promise<Versio
 
   // 2. Rozpakowanie instalatora (bezpiecznie).
   await extractArchive(installerJar, workDir, { overwrite: true });
+
+  // Artefakty z pustym URL-em (m.in. Forge bootstrap i universal) są
+  // osadzone w instalatorze i muszą trafić do wspólnego repozytorium Maven.
+  const embeddedCount = await copyEmbeddedMavenFiles(workDir, librariesDir());
+  if (embeddedCount > 0) log.info(`Skopiowano ${embeddedCount} osadzonych artefaktów ${loader}`);
 
   const profilePath = path.join(workDir, 'install_profile.json');
   if (!fs.existsSync(profilePath)) {

@@ -234,9 +234,24 @@ export async function resolveInstanceVersion(instance: Instance): Promise<Versio
     base = await getVersionJson(instance.mcVersion);
   } else {
     base = await loadVersionProfile(instance.versionId);
-    if (!base) return installLoaderProfile(instance);
+    if (!base || loaderProfileHasMissingLocalArtifacts(base)) return installLoaderProfile(instance);
   }
   return resolveVersionChain(base, loadParent);
+}
+
+/** Wykrywa artefakty loadera z pustym URL-em, które powinien utworzyć lub wypakować instalator. */
+export function loaderProfileHasMissingLocalArtifacts(profile: VersionJson): boolean {
+  return missingLoaderArtifactCount(profile) > 0;
+}
+
+export function missingLoaderArtifactCount(profile: VersionJson): number {
+  return (profile.libraries ?? []).filter((lib) => {
+    const artifact = lib.downloads?.artifact;
+    if (!artifact || artifact.url) return false;
+    const rel = artifact.path;
+    if (!rel) return false;
+    return !fs.existsSync(path.join(librariesDir(), ...rel.split('/')));
+  }).length;
 }
 
 /** Instaluje profil modloadera, jeżeli jeszcze go nie ma. */
@@ -307,8 +322,11 @@ export async function installInstance(instanceId: string, opts: InstallOptions =
   const progress = opts.onProgress;
 
   // 1. Profil loadera (jeśli trzeba).
-  if (instance.loader !== 'vanilla' && !(await loadVersionProfile(instance.versionId))) {
-    await installLoaderProfile(instance, progress);
+  if (instance.loader !== 'vanilla') {
+    const loaderProfile = await loadVersionProfile(instance.versionId);
+    if (!loaderProfile || loaderProfileHasMissingLocalArtifacts(loaderProfile)) {
+      await installLoaderProfile(instance, progress);
+    }
   }
 
   // 2. Pełne metadane wersji.
@@ -443,11 +461,13 @@ async function materializeVirtualAssets(index: AssetIndex, assetsId: string, ins
 /** Naprawa: weryfikuje wszystkie pliki i pobiera brakujące/uszkodzone. */
 export async function repairInstance(instanceId: string, opts: InstallOptions = {}): Promise<{ repaired: number }> {
   const instance = getInstance(instanceId);
+  const loaderProfile = instance.loader === 'vanilla' ? null : await loadVersionProfile(instance.versionId);
+  const missingLoaderFiles = loaderProfile ? missingLoaderArtifactCount(loaderProfile) : (instance.loader === 'vanilla' ? 0 : 1);
   const version = await resolveInstanceVersion(instance);
   const ctx = currentOsContext();
   const libs = resolveLibraries(version, ctx);
 
-  let broken = 0;
+  let broken = missingLoaderFiles;
   for (const lib of libs) {
     const file = path.join(librariesDir(), ...lib.relPath.split('/'));
     if (!(await verifyFile(file, { sha1: lib.sha1, size: lib.size }))) {

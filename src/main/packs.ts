@@ -14,7 +14,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { ENDPOINTS } from '../shared/constants.js';
-import { DownloadQueue } from './downloader.js';
+import { DownloadQueue, verifyFile } from './downloader.js';
 import { extractArchive, inspectArchive, readArchiveEntry, UnsafeArchiveError } from './zipsafe.js';
 import { createInstance, getInstance, refreshModCount } from './instances.js';
 import { getSecret, SECRET_KEYS } from './secrets.js';
@@ -40,6 +40,82 @@ export class PackError extends Error {
   ) {
     super(message);
     this.name = 'PackError';
+  }
+}
+
+interface PackLockDownloadFile {
+  source: 'download';
+  path: string;
+  downloads: string[];
+  size?: number;
+  sha1?: string;
+}
+
+interface PackLockCurseForgeFile {
+  source: 'curseforge';
+  projectID: number;
+  fileID: number;
+}
+
+interface PackRepairLock {
+  format: 'nightmc-pack-lock';
+  formatVersion: 1;
+  kind: 'mrpack' | 'curseforge';
+  name: string;
+  files: (PackLockDownloadFile | PackLockCurseForgeFile)[];
+}
+
+function packLockPath(instance: Instance): string {
+  return path.join(instance.dir, 'minecraft', '.nightmc-pack-lock.json');
+}
+
+async function savePackLock(instance: Instance, lock: PackRepairLock): Promise<void> {
+  const file = packLockPath(instance);
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  await fsp.writeFile(file, JSON.stringify(lock, null, 2), 'utf8');
+}
+
+export function parsePackLock(raw: unknown): PackRepairLock | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Partial<PackRepairLock>;
+  if (value.format !== 'nightmc-pack-lock' || value.formatVersion !== 1) return null;
+  if (value.kind !== 'mrpack' && value.kind !== 'curseforge') return null;
+  if (typeof value.name !== 'string' || value.name.length < 1 || value.name.length > 200) return null;
+  if (!Array.isArray(value.files) || value.files.length > 200_000) return null;
+  const files: (PackLockDownloadFile | PackLockCurseForgeFile)[] = [];
+  for (const item of value.files as unknown[]) {
+    if (!item || typeof item !== 'object') return null;
+    const candidate = item as Record<string, unknown>;
+    if (candidate['source'] === 'download') {
+      if (typeof candidate['path'] !== 'string') return null;
+      validatePackFilePath(candidate['path']);
+      if (!Array.isArray(candidate['downloads']) || candidate['downloads'].length > 16) return null;
+      if (!candidate['downloads'].every((url) => typeof url === 'string' && url.length <= 4096)) return null;
+      if (candidate['size'] !== undefined && (!Number.isSafeInteger(candidate['size']) || Number(candidate['size']) < 0)) return null;
+      if (candidate['sha1'] !== undefined && (typeof candidate['sha1'] !== 'string' || !/^[a-f0-9]{40}$/i.test(candidate['sha1']))) return null;
+      files.push({
+        source: 'download',
+        path: candidate['path'],
+        downloads: candidate['downloads'] as string[],
+        size: candidate['size'] as number | undefined,
+        sha1: candidate['sha1'] as string | undefined,
+      });
+    } else if (candidate['source'] === 'curseforge') {
+      if (!Number.isSafeInteger(candidate['projectID']) || Number(candidate['projectID']) <= 0) return null;
+      if (!Number.isSafeInteger(candidate['fileID']) || Number(candidate['fileID']) <= 0) return null;
+      files.push({ source: 'curseforge', projectID: Number(candidate['projectID']), fileID: Number(candidate['fileID']) });
+    } else {
+      return null;
+    }
+  }
+  return { format: 'nightmc-pack-lock', formatVersion: 1, kind: value.kind, name: value.name, files };
+}
+
+export async function readPackLock(instance: Instance): Promise<PackRepairLock | null> {
+  try {
+    return parsePackLock(JSON.parse(await fsp.readFile(packLockPath(instance), 'utf8')));
+  } catch {
+    return null;
   }
 }
 
@@ -209,6 +285,22 @@ async function importMrpack(
       res.failed[0]?.error,
     );
   }
+
+  await savePackLock(instance, {
+    format: 'nightmc-pack-lock',
+    formatVersion: 1,
+    kind: 'mrpack',
+    name: index.name,
+    files: index.files
+      .filter((f) => (f.env?.client ?? 'required') !== 'unsupported')
+      .map((f) => ({
+        source: 'download' as const,
+        path: validatePackFilePath(f.path),
+        downloads: f.downloads.filter((url) => isAllowedUrl(url)),
+        size: f.fileSize,
+        sha1: f.hashes.sha1,
+      })),
+  });
 
   refreshModCount(instance.id);
   log.info(`Zaimportowano paczkę Modrinth "${index.name}" jako instancję "${instanceName}"`);
@@ -398,6 +490,16 @@ async function importCurseForge(
     if (queue.size > 0) await queue.run();
   }
 
+  await savePackLock(instance, {
+    format: 'nightmc-pack-lock',
+    formatVersion: 1,
+    kind: 'curseforge',
+    name: manifest.name,
+    files: manifest.files
+      .filter((f) => f.required !== false)
+      .map((f) => ({ source: 'curseforge', projectID: f.projectID, fileID: f.fileID })),
+  });
+
   refreshModCount(instance.id);
   log.info(`Zaimportowano paczkę CurseForge "${manifest.name}" jako "${instanceName}"`);
   return getInstance(instance.id);
@@ -432,4 +534,83 @@ export async function importPack(
       : await importCurseForge(entry.file, instanceName, entry.manual, defaults, onProgress);
   previews.delete(token);
   return instance;
+}
+
+export interface PackRepairResult {
+  manifestFound: boolean;
+  checked: number;
+  repaired: number;
+  missing: number;
+  warnings: string[];
+}
+
+/** Weryfikuje i ponownie pobiera pliki zadeklarowane przez zaimportowaną paczkę. */
+export async function repairPackFiles(
+  instanceId: string,
+  onProgress?: (p: DownloadProgress) => void,
+): Promise<PackRepairResult> {
+  const instance = getInstance(instanceId);
+  const lock = await readPackLock(instance);
+  if (!lock) return { manifestFound: false, checked: 0, repaired: 0, missing: 0, warnings: [] };
+
+  const gameDir = path.join(instance.dir, 'minecraft');
+  const queue = new DownloadQueue({ onProgress, phase: `Naprawa paczki „${lock.name}”` });
+  const warnings: string[] = [];
+  let repaired = 0;
+  let missing = 0;
+  const apiKey = lock.kind === 'curseforge' ? await getSecret(SECRET_KEYS.curseforgeApiKey()) : null;
+
+  for (const item of lock.files) {
+    if (item.source === 'download') {
+      const rel = validatePackFilePath(item.path);
+      const dest = path.join(gameDir, ...rel.split('/'));
+      if (await verifyFile(dest, { size: item.size, sha1: item.sha1 })) continue;
+      const url = item.downloads.find((candidate) => isAllowedUrl(candidate));
+      if (!url) {
+        missing++;
+        warnings.push(`${rel}: brak bezpiecznego adresu pobierania.`);
+        continue;
+      }
+      queue.add({ id: rel, url, dest, size: item.size, sha1: item.sha1, label: path.basename(rel) });
+      repaired++;
+      continue;
+    }
+
+    if (!apiKey) {
+      missing++;
+      continue;
+    }
+    const info = await curseForgeFileInfo(item.projectID, item.fileID, apiKey);
+    if (!info?.downloadUrl) {
+      missing++;
+      warnings.push(`CurseForge ${item.projectID}/${item.fileID}: pobieranie przez aplikacje zewnętrzne jest niedostępne.`);
+      continue;
+    }
+    const dest = path.join(gameDir, 'mods', path.basename(info.fileName));
+    const sha1 = info.hashes?.find((hash) => hash.algo === 1)?.value;
+    if (await verifyFile(dest, { size: info.fileLength, sha1 })) continue;
+    queue.add({
+      id: `cf-${item.projectID}-${item.fileID}`,
+      url: info.downloadUrl,
+      dest,
+      size: info.fileLength,
+      sha1,
+      label: info.displayName,
+    });
+    repaired++;
+  }
+
+  if (!apiKey && lock.kind === 'curseforge' && lock.files.length > 0) {
+    warnings.unshift('Brak klucza API CurseForge — nie można automatycznie sprawdzić ani pobrać wymaganych modów.');
+  }
+
+  if (queue.size > 0) {
+    const result = await queue.run();
+    if (!result.ok && !result.cancelled) {
+      throw new PackError(`Nie udało się naprawić ${result.failed.length} plików paczki.`, result.failed[0]?.error);
+    }
+  }
+  refreshModCount(instanceId);
+  for (const warning of warnings) log.warn(`Naprawa paczki: ${warning}`, instanceId);
+  return { manifestFound: true, checked: lock.files.length, repaired, missing, warnings };
 }

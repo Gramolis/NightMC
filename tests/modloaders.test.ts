@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   neoforgePrefix,
+  copyEmbeddedMavenFiles,
   parseMavenMetadata,
   readJarMainClass,
   resolveDataValue,
@@ -80,6 +81,19 @@ describe('profil instalacyjny Forge/NeoForge', () => {
     const out = substituteProcessorArg('[net.minecraftforge:forge:1.20.1-47.2.0:extra]', {}, ctx);
     expect(out).toContain(path.join('net', 'minecraftforge', 'forge'));
     expect(out.endsWith('forge-1.20.1-47.2.0-extra.jar')).toBe(true);
+  });
+
+  it('kopiuje artefakty Maven osadzone w instalatorze', async () => {
+    const installer = path.join(tmp, 'installer');
+    const target = path.join(tmp, 'libraries');
+    const embedded = path.join(installer, 'maven', 'net', 'minecraftforge', 'forge', '1.16.5-36.2.34');
+    await fsp.mkdir(embedded, { recursive: true });
+    await fsp.writeFile(path.join(embedded, 'forge-1.16.5-36.2.34.jar'), 'bootstrap');
+    await fsp.writeFile(path.join(embedded, 'forge-1.16.5-36.2.34-universal.jar'), 'universal');
+
+    expect(await copyEmbeddedMavenFiles(installer, target)).toBe(2);
+    expect(await fsp.readFile(path.join(target, 'net', 'minecraftforge', 'forge', '1.16.5-36.2.34', 'forge-1.16.5-36.2.34.jar'), 'utf8'))
+      .toBe('bootstrap');
   });
 });
 
