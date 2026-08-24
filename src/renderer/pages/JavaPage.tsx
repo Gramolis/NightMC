@@ -44,7 +44,11 @@ export function JavaPage() {
   }, []);
 
   const sliderMin = 1024;
-  const sliderMax = Math.max(sliderMin, Math.floor((memory?.hardLimitMB ?? 8192) / 512) * 512);
+  const safeMemoryMax = Math.max(sliderMin, Math.floor((memory?.hardLimitMB ?? 8192) / 512) * 512);
+  // Pokazujemy również niedozwoloną strefę nad bezpiecznym maksimum, aby gracz
+  // widział granicę możliwości komputera. Nie pozwalamy jednak jej zapisać.
+  const physicalMemoryMax = Math.max(sliderMin, Math.floor(((memory?.totalMB ?? 8192) - 512) / 512) * 512);
+  const sliderMax = Math.max(safeMemoryMax, physicalMemoryMax);
   const optimalMemory = recommendedInstanceMemoryMB(
     memory?.totalMB ?? 8192,
     instance?.modCount ?? 0,
@@ -53,12 +57,16 @@ export function JavaPage() {
   const optimalPosition = sliderMax === sliderMin
     ? 0
     : ((optimalMemory - sliderMin) / (sliderMax - sliderMin)) * 100;
-  const level = memoryLevel(selectedMemory, optimalMemory, sliderMax);
+  const dangerPosition = sliderMax === sliderMin
+    ? 100
+    : ((safeMemoryMax - sliderMin) / (sliderMax - sliderMin)) * 100;
+  const level = memoryLevel(selectedMemory, optimalMemory, safeMemoryMax);
   const levelInfo = {
     low: { label: 'Może być za mało', tone: 'warn' as const, detail: 'Gra lub większa paczka może ładować się wolniej albo zabraknie jej pamięci.' },
     optimal: { label: 'Optymalne', tone: 'ok' as const, detail: 'Najlepszy balans dla tej instancji i tego komputera.' },
     elevated: { label: 'Powyżej rekomendacji', tone: 'cyan' as const, detail: 'Bezpiecznie, ale dodatkowy RAM prawdopodobnie nie przyspieszy gry.' },
-    high: { label: 'Wysokie zużycie', tone: 'err' as const, detail: 'Zostaje mało pamięci dla Windows, launchera i innych programów.' },
+    high: { label: 'Bardzo wysokie', tone: 'warn' as const, detail: 'To nadal mieści się w bezpiecznym limicie, ale zostaje mało zapasu dla innych programów.' },
+    critical: { label: 'Za dużo RAM-u', tone: 'err' as const, detail: `Komputer tego nie udźwignie bez ryzyka zacięć. Ustaw maksymalnie ${formatMemory(safeMemoryMax)}, aby zostawić pamięć dla Windows i launchera.` },
   }[level];
 
   useEffect(() => {
@@ -219,6 +227,9 @@ export function JavaPage() {
                 </div>
                 <input
                   className="memory-slider"
+                  style={{
+                    background: `linear-gradient(90deg, #45e3a0 0%, #75e18c ${Math.max(18, dangerPosition - 30)}%, #ffc65c ${Math.max(20, dangerPosition - 0.2)}%, #ff5f77 ${dangerPosition}%, #9d1538 100%)`,
+                  }}
                   type="range"
                   min={sliderMin}
                   max={sliderMax}
@@ -229,7 +240,8 @@ export function JavaPage() {
                 />
                 <div className="memory-scale">
                   <span>{formatMemory(sliderMin)}</span>
-                  <span>Bezpieczne maksimum: {formatMemory(sliderMax)}</span>
+                  <span>Bezpieczne maksimum: {formatMemory(safeMemoryMax)}</span>
+                  <span>Granica fizyczna: {formatMemory(sliderMax)}</span>
                 </div>
               </div>
 
@@ -245,10 +257,10 @@ export function JavaPage() {
                 <Button
                   small
                   variant="primary"
-                  disabled={busy || selectedMemory === (instance?.memoryMax ?? settings?.defaultMemoryMax)}
+                  disabled={busy || selectedMemory > safeMemoryMax || selectedMemory === (instance?.memoryMax ?? settings?.defaultMemoryMax)}
                   onClick={() => void applyMemory(selectedMemory)}
                 >
-                  Zastosuj {formatMemory(selectedMemory)}
+                  {selectedMemory > safeMemoryMax ? 'Zmniejsz przydział' : `Zastosuj ${formatMemory(selectedMemory)}`}
                 </Button>
               </div>
             </div>

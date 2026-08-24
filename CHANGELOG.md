@@ -7,9 +7,14 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ### Dodano
 
+- Dynamiczną czerwoną strefę suwaka RAM powyżej bezpiecznego maksimum komputera; wartości z tej strefy nie mogą zostać zapisane.
 - Diagnostykę lokalnych modów odczytującą bez uruchamiania kodu metadane Fabric, Forge, NeoForge, Quilt i starszego Forge.
 - Wykrywanie duplikatów, złego loadera, brakujących lub niezgodnych zależności, konfliktów, uszkodzonych JAR-ów i podejrzanych archiwów.
 - Panel „Sprawdź mody” w zakładce modów z podsumowaniem błędów, ostrzeżeń i sugerowanymi rozwiązaniami.
+
+### Naprawiono
+
+- Wartości RAM poniżej rekomendacji nie są już błędnie opisywane jako „Powyżej rekomendacji”.
 
 ## [1.0.3] — 2026-08-24
 

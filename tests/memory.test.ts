@@ -20,8 +20,10 @@ describe('automatyczny dobór RAM-u', () => {
 
   it('klasyfikuje pozycję suwaka', () => {
     expect(memoryLevel(2048, 6144, 12288)).toBe('low');
+    expect(memoryLevel(5632, 6144, 12288)).toBe('low');
     expect(memoryLevel(6144, 6144, 12288)).toBe('optimal');
     expect(memoryLevel(8192, 6144, 12288)).toBe('elevated');
     expect(memoryLevel(11264, 6144, 12288)).toBe('high');
+    expect(memoryLevel(12800, 6144, 12288)).toBe('critical');
   });
 });

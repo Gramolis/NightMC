@@ -21,11 +21,14 @@ export function recommendedInstanceMemoryMB(totalMB: number, modCount: number, m
   return Math.max(1024, Math.min(desired, safeMemoryLimitMB(totalMB)));
 }
 
-export type MemoryLevel = 'low' | 'optimal' | 'elevated' | 'high';
+export type MemoryLevel = 'low' | 'optimal' | 'elevated' | 'high' | 'critical';
 
 export function memoryLevel(selectedMB: number, optimalMB: number, safeMaxMB: number): MemoryLevel {
-  if (selectedMB < Math.max(1024, optimalMB - 1024)) return 'low';
-  if (Math.abs(selectedMB - optimalMB) <= 512) return 'optimal';
+  if (selectedMB > safeMaxMB) return 'critical';
+  // Każda wartość poniżej rekomendacji musi być opisana jako za mała,
+  // nigdy jako „powyżej rekomendacji”.
+  if (selectedMB < optimalMB) return 'low';
+  if (selectedMB <= optimalMB + 512) return 'optimal';
   if (selectedMB >= safeMaxMB * 0.85) return 'high';
   return 'elevated';
 }
