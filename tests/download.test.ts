@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { DownloadQueue, hashBuffer, hashFile, verifyFile, writeAtomic } from '../src/main/downloader.js';
-import { isAllowedUrl } from '../src/main/net.js';
+import { isAllowedUrl, safeUrlForMessage } from '../src/main/net.js';
 
 const PAYLOAD = Buffer.from('NightMC testowa zawartość pliku — '.repeat(500), 'utf8');
 const SHA1 = hashBuffer(PAYLOAD, 'sha1');
@@ -208,6 +208,12 @@ describe('polityka adresów', () => {
     expect(isAllowedUrl('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')).toBe(true);
     expect(isAllowedUrl('https://cdn.modrinth.com/data/abc/versions/1/mod.jar')).toBe(true);
     expect(isAllowedUrl('https://maven.neoforged.net/releases/x.jar')).toBe(true);
+    expect(isAllowedUrl('https://release-assets.githubusercontent.com/github-production-release-asset/java.zip?sig=secret')).toBe(true);
+  });
+
+  it('usuwa tymczasowe parametry z adresów pokazywanych w błędach', () => {
+    expect(safeUrlForMessage('https://release-assets.githubusercontent.com/file.zip?sig=secret&jwt=token'))
+      .toBe('https://release-assets.githubusercontent.com/file.zip');
   });
 
   it('odrzuca http, obce hosty i adresy z danymi logowania', () => {

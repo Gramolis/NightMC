@@ -43,6 +43,12 @@ describe('redakcja danych poufnych', () => {
     expect(url).toContain('[USUNIĘTY]');
   });
 
+  it('usuwa podpis i token z tymczasowego URL GitHub Releases', () => {
+    const out = redact('https://release-assets.githubusercontent.com/java.zip?sig=sekretny-podpis&jwt=sekretny-token');
+    expect(out).not.toContain('sekretny-podpis');
+    expect(out).not.toContain('sekretny-token');
+  });
+
   it('nie rusza zwykłych komunikatów', () => {
     const msg = 'Pobrano 1234 plików do C:\\Users\\aleks\\AppData\\Roaming\\NightMC';
     expect(redact(msg)).toBe(msg);

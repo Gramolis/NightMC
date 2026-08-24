@@ -31,7 +31,10 @@ const REDACTIONS: { re: RegExp; replace: string }[] = [
   // XBL/XSTS token
   { re: /\b(XBL3\.0 x=)[^\s"]+/g, replace: '$1[USUNIĘTY]' },
   // Kod autoryzacyjny w URL
-  { re: /([?&](?:code|access_token|refresh_token|state|code_verifier)=)[^&\s]+/gi, replace: '$1[USUNIĘTY]' },
+  {
+    re: /([?&](?:code|access_token|refresh_token|state|code_verifier|sig|jwt|token|skoid|sktid|skt|ske|sks|skv)=)[^&\s]+/gi,
+    replace: '$1[USUNIĘTY]',
+  },
   // Klucz CurseForge ($2a$10$... 60 znaków)
   { re: /\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/g, replace: '[KLUCZ USUNIĘTY]' },
 ];

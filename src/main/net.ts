@@ -23,6 +23,16 @@ export class NetError extends Error {
   }
 }
 
+/** Adres do komunikatu błędu bez parametrów, które mogą zawierać token pobierania. */
+export function safeUrlForMessage(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '[nieprawidłowy adres]';
+  }
+}
+
 /** Sprawdza, czy URL jest bezpiecznym adresem HTTPS na dozwolonym hoście. */
 export function isAllowedUrl(rawUrl: string): boolean {
   let u: URL;
@@ -39,7 +49,7 @@ export function isAllowedUrl(rawUrl: string): boolean {
 
 export function assertAllowedUrl(rawUrl: string): URL {
   if (!isAllowedUrl(rawUrl)) {
-    throw new NetError(`Adres zablokowany przez politykę sieciową NightMC: ${rawUrl}`);
+    throw new NetError(`Adres zablokowany przez politykę sieciową NightMC: ${safeUrlForMessage(rawUrl)}`);
   }
   return new URL(rawUrl);
 }
@@ -80,7 +90,7 @@ export async function httpRequest(url: string, opts: FetchOptions = {}): Promise
   const hostOk =
     isAllowedUrl(url) ||
     (inExtra && (u.protocol === 'https:' || (u.protocol === 'http:' && isLoopback)));
-  if (!hostOk) throw new NetError(`Adres zablokowany przez politykę sieciową NightMC: ${url}`);
+  if (!hostOk) throw new NetError(`Adres zablokowany przez politykę sieciową NightMC: ${safeUrlForMessage(url)}`);
 
   const timeout = opts.timeoutMs ?? LIMITS.metaTimeoutMs;
   const ctrl = new AbortController();
@@ -97,12 +107,12 @@ export async function httpRequest(url: string, opts: FetchOptions = {}): Promise
     if (res.url && res.url !== url) {
       const finalHost = new URL(res.url).hostname.toLowerCase();
       const finalOk = isAllowedUrl(res.url) || extra.some((h) => finalHost === h.toLowerCase());
-      if (!finalOk) throw new NetError(`Przekierowanie na niedozwolony host: ${res.url}`);
+      if (!finalOk) throw new NetError(`Przekierowanie na niedozwolony host: ${safeUrlForMessage(res.url)}`);
     }
     return res;
   } catch (e) {
     if ((e as Error).name === 'AbortError') {
-      throw new NetError(`Przekroczono limit czasu (${timeout} ms): ${url}`, undefined, url);
+      throw new NetError(`Przekroczono limit czasu (${timeout} ms): ${safeUrlForMessage(url)}`, undefined, url);
     }
     throw e;
   } finally {
@@ -113,10 +123,10 @@ export async function httpRequest(url: string, opts: FetchOptions = {}): Promise
 /** Pobiera tekst z limitem rozmiaru. */
 export async function fetchText(url: string, opts: FetchOptions = {}): Promise<string> {
   const res = await httpRequest(url, opts);
-  if (!res.ok) throw new NetError(`HTTP ${res.status} dla ${url}`, res.status, url);
+  if (!res.ok) throw new NetError(`HTTP ${res.status} dla ${safeUrlForMessage(url)}`, res.status, url);
   const max = opts.maxBytes ?? LIMITS.maxJsonBytes;
   const declared = Number(res.headers.get('content-length') ?? '0');
-  if (declared > max) throw new NetError(`Odpowiedź za duża (${declared} B > ${max} B): ${url}`);
+  if (declared > max) throw new NetError(`Odpowiedź za duża (${declared} B > ${max} B): ${safeUrlForMessage(url)}`);
 
   if (!res.body) return await res.text();
   const reader = res.body.getReader();
@@ -129,7 +139,7 @@ export async function fetchText(url: string, opts: FetchOptions = {}): Promise<s
       total += value.byteLength;
       if (total > max) {
         await reader.cancel();
-        throw new NetError(`Odpowiedź przekroczyła limit ${max} B: ${url}`);
+        throw new NetError(`Odpowiedź przekroczyła limit ${max} B: ${safeUrlForMessage(url)}`);
       }
       chunks.push(value);
     }
@@ -146,7 +156,7 @@ export async function fetchJson<T = unknown>(url: string, opts: FetchOptions = {
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new NetError(`Nieprawidłowy JSON z ${url}`);
+    throw new NetError(`Nieprawidłowy JSON z ${safeUrlForMessage(url)}`);
   }
 }
 

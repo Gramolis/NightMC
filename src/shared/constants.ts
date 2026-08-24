@@ -81,6 +81,8 @@ export const ALLOWED_HOSTS: readonly string[] = [
   'api.adoptium.net',
   'github.com',
   'objects.githubusercontent.com',
+  // Pliki binarne GitHub Releases (m.in. przekierowanie JRE z Adoptium).
+  'release-assets.githubusercontent.com',
   'api.github.com',
   'raw.githubusercontent.com',
   // CurseForge (tylko z własnym kluczem użytkownika)
@@ -135,13 +137,13 @@ export const NETWORK_SERVICES = [
   },
   {
     name: 'Eclipse Adoptium',
-    hosts: ['api.adoptium.net', 'github.com', 'objects.githubusercontent.com'],
+    hosts: ['api.adoptium.net', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'],
     purpose: 'Pobieranie środowiska Java (Temurin).',
     optional: true,
   },
   {
     name: 'GitHub Releases',
-    hosts: ['api.github.com', 'objects.githubusercontent.com'],
+    hosts: ['api.github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'],
     purpose: 'Sprawdzanie i pobieranie aktualizacji NightMC.',
     optional: true,
   },
