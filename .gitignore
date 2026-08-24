@@ -3,6 +3,7 @@ node_modules/
 pnpm-lock.yaml
 out/
 dist/
+dist-*/
 coverage/
 .env
 .env.local
