@@ -3,6 +3,13 @@
 W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projekt stosuje format
 [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/), a wersje wydań są zgodne z tagami GitHub.
 
+## [Unreleased]
+
+### Dodano
+
+- Wbudowany ekran changeloga w NightMC, automatycznie synchronizowany z `CHANGELOG.md` na GitHubie.
+- Ręczne odświeżanie changeloga oraz zapisaną kopię używaną przy braku internetu.
+
 ## [1.0.1] — 2026-08-24
 
 ### Dodano
@@ -45,5 +52,6 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 - Aktualizacje i aktualności z repozytorium GitHub.
 - Logi, diagnostykę uruchomienia, kopie zapasowe i eksport instancji.
 
+[Unreleased]: https://github.com/Gramolis/NightMC/compare/v1.0.1...HEAD
 [1.0.1]: https://github.com/Gramolis/NightMC/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Gramolis/NightMC/releases/tag/v1.0.0

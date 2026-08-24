@@ -323,6 +323,7 @@ export const INVOKE_SCHEMAS = {
   'updates:check': v.void(),
   'updates:download': v.void(),
   'news:get': v.void(),
+  'changelog:get': v.object({ refresh: v.optional(v.boolean()) }),
 
   /* --- CurseForge --- */
   'curseforge:setKey': v.object({ key: v.string({ max: 256 }) }),

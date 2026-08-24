@@ -65,6 +65,7 @@ import {
 import { launchGame, setLauncherVersion, stopAll, stopGame, runningGames } from './launcher.js';
 import { checkForUpdate, downloadUpdate, revealUpdate } from './updates.js';
 import { getNews } from './news.js';
+import { getChangelog } from './changelog.js';
 import { deleteSecret, SECRET_KEYS, secretsBackend, setSecret } from './secrets.js';
 import { DATA_SOURCES, THIRD_PARTY_LICENSES } from './licenses.js';
 
@@ -708,6 +709,7 @@ function registerHandlers(): void {
     return { downloaded: true, file: result.file, signatureValid: result.signatureValid };
   });
   on('news:get', () => getNews());
+  on('changelog:get', ({ refresh }) => getChangelog(refresh));
 
   /* --- CurseForge --- */
   on('curseforge:setKey', async ({ key }) => {

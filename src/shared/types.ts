@@ -468,6 +468,13 @@ export interface UpdateInfo {
   signature?: string;
 }
 
+export interface ChangelogDocument {
+  content: string;
+  sourceUrl: string;
+  fetchedAt: string;
+  fromCache: boolean;
+}
+
 export interface NewsItem {
   id: string;
   title: string;

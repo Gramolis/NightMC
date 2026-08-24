@@ -7,7 +7,7 @@ import { Banner, Button, Card, Chip, DownloadPanel, Stat } from '../components/U
 import { Logo } from '../components/Logo.js';
 import { IconDownload, IconRefresh } from '../components/Icons.js';
 import { LEGAL_DISCLAIMER, ENDPOINTS } from '../../shared/constants.js';
-import type { UpdateInfo } from '../../shared/types.js';
+import type { ChangelogDocument, UpdateInfo } from '../../shared/types.js';
 
 interface LicenseEntry {
   name: string;
@@ -16,16 +16,54 @@ interface LicenseEntry {
   url: string;
 }
 
+function plainMarkdown(line: string): string {
+  return line
+    .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1');
+}
+
+function ChangelogContent({ content }: { content: string }) {
+  return (
+    <div className="github-changelog">
+      {content.split('\n').map((raw, index) => {
+        const line = raw.trim();
+        if (!line || /^\[[^\]]+]:\s+https:\/\//.test(line)) return null;
+        if (line.startsWith('# ')) return <div key={index} className="changelog-main-title">{plainMarkdown(line.slice(2))}</div>;
+        if (line.startsWith('## ')) return <div key={index} className="changelog-version">{plainMarkdown(line.slice(3))}</div>;
+        if (line.startsWith('### ')) return <h3 key={index} className="changelog-group">{plainMarkdown(line.slice(4))}</h3>;
+        if (line.startsWith('- ')) return <div key={index} className="changelog-entry"><span>•</span><p>{plainMarkdown(line.slice(2))}</p></div>;
+        return <p key={index} className="changelog-paragraph">{plainMarkdown(line)}</p>;
+      })}
+    </div>
+  );
+}
+
 export function AboutPage() {
   const { system, update, progress, pushToast } = useStore();
   const [licenses, setLicenses] = useState<{ libraries: LicenseEntry[]; sources: LicenseEntry[] } | null>(null);
   const [checking, setChecking] = useState(false);
   const [info, setInfo] = useState<UpdateInfo | null>(update);
-  const [tab, setTab] = useState<'update' | 'network' | 'licenses' | 'legal'>('update');
+  const [tab, setTab] = useState<'update' | 'changelog' | 'network' | 'licenses' | 'legal'>('update');
+  const [changelog, setChangelog] = useState<ChangelogDocument | null>(null);
+  const [loadingChangelog, setLoadingChangelog] = useState(false);
 
   useEffect(() => {
     void call<{ libraries: LicenseEntry[]; sources: LicenseEntry[] }>('app:licenses').then(setLicenses).catch(() => undefined);
   }, []);
+
+  const loadChangelog = (refresh = false) => {
+    setLoadingChangelog(true);
+    void call<ChangelogDocument>('changelog:get', { refresh })
+      .then(setChangelog)
+      .catch((e) => pushToast('error', (e as Error).message))
+      .finally(() => setLoadingChangelog(false));
+  };
+
+  useEffect(() => {
+    if (tab === 'changelog' && !changelog && !loadingChangelog) loadChangelog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   const open = (url: string) => void call('app:openExternal', { url }).catch(() => undefined);
 
@@ -41,6 +79,7 @@ export function AboutPage() {
 
       <div className="tabs">
         <button className={`tab${tab === 'update' ? ' active' : ''}`} onClick={() => setTab('update')}>Aktualizacje</button>
+        <button className={`tab${tab === 'changelog' ? ' active' : ''}`} onClick={() => setTab('changelog')}>Changelog</button>
         <button className={`tab${tab === 'network' ? ' active' : ''}`} onClick={() => setTab('network')}>Usługi sieciowe</button>
         <button className={`tab${tab === 'licenses' ? ' active' : ''}`} onClick={() => setTab('licenses')}>Licencje</button>
         <button className={`tab${tab === 'legal' ? ' active' : ''}`} onClick={() => setTab('legal')}>Zgodność prawna</button>
@@ -106,6 +145,37 @@ export function AboutPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {tab === 'changelog' && (
+        <Card
+          title="Changelog NightMC"
+          subtitle="Aktualizowany automatycznie z pliku CHANGELOG.md w repozytorium NightMC."
+          actions={
+            <div className="row wrap" style={{ gap: 8 }}>
+              {changelog?.fromCache && <Chip tone="warn">kopia offline</Chip>}
+              <Button small disabled={loadingChangelog} onClick={() => loadChangelog(true)}>
+                <IconRefresh size={14} /> {loadingChangelog ? 'Odświeżam…' : 'Odśwież z GitHuba'}
+              </Button>
+              {changelog?.sourceUrl && <Button small variant="ghost" onClick={() => open(changelog.sourceUrl)}>Otwórz na GitHubie</Button>}
+            </div>
+          }
+        >
+          {loadingChangelog && !changelog ? (
+            <div className="grid" style={{ gap: 9 }}>
+              {Array.from({ length: 6 }, (_, index) => <div key={index} className="skeleton" style={{ height: index === 0 ? 54 : 34 }} />)}
+            </div>
+          ) : changelog ? (
+            <>
+              <div className="changelog-sync-row">
+                Źródło: GitHub · pobrano {formatDate(changelog.fetchedAt)}
+              </div>
+              <ChangelogContent content={changelog.content} />
+            </>
+          ) : (
+            <Banner kind="info">Changelog nie został jeszcze pobrany.</Banner>
+          )}
+        </Card>
       )}
 
       {tab === 'network' && (

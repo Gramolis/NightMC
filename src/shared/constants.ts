@@ -142,9 +142,9 @@ export const NETWORK_SERVICES = [
     optional: true,
   },
   {
-    name: 'GitHub Releases',
-    hosts: ['api.github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'],
-    purpose: 'Sprawdzanie i pobieranie aktualizacji NightMC.',
+    name: 'GitHub NightMC',
+    hosts: ['api.github.com', 'raw.githubusercontent.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'],
+    purpose: 'Sprawdzanie i pobieranie aktualizacji oraz synchronizacja changeloga NightMC.',
     optional: true,
   },
   {
