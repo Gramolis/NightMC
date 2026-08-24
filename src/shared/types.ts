@@ -519,5 +519,117 @@ export interface SystemInfo {
   isDev: boolean;
 }
 
+/* ------------------------------------------------------------------ */
+/* Analiza lokalnych modów                                             */
+/* ------------------------------------------------------------------ */
+
+/** Loader zadeklarowany w metadanych pliku JAR. */
+export type ModMetadataLoader = 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'unknown';
+
+/** Źródło, z którego odczytano metadane moda. */
+export type ModMetadataSource =
+  | 'fabric.mod.json'
+  | 'quilt.mod.json'
+  | 'META-INF/mods.toml'
+  | 'META-INF/neoforge.mods.toml'
+  | 'mcmod.info'
+  | 'none';
+
+/** Pojedyncza zależność zadeklarowana przez moda. */
+export interface ModDependency {
+  modId: string;
+  /** Zakres wersji w zapisie Maven ("[1.20,1.21)") albo semver (">=0.15.0"). */
+  versionRange?: string;
+  /** Rodzaj relacji zadeklarowany przez moda. */
+  kind: 'required' | 'optional' | 'incompatible' | 'discouraged' | 'embedded';
+}
+
+/** Metadane jednego pliku moda odczytane bez uruchamiania jego kodu. */
+export interface LocalModMetadata {
+  fileName: string;
+  filePath: string;
+  size: number;
+  sha1: string;
+  enabled: boolean;
+  modId?: string;
+  /** Dodatkowe identyfikatory dostarczane przez ten sam plik JAR. */
+  providedModIds: string[];
+  name?: string;
+  version?: string;
+  description?: string;
+  authors?: string[];
+  loader: ModMetadataLoader;
+  metadataSource: ModMetadataSource;
+  dependencies: ModDependency[];
+  /** Zakresy wersji Minecrafta wyliczone z zależności "minecraft". */
+  mcVersionRanges: string[];
+  /** Ostrzeżenia napotkane przy odczycie tego konkretnego pliku. */
+  readWarnings: string[];
+}
+
+/** Plik, którego nie udało się przeanalizować. Analiza pozostałych trwa dalej. */
+export interface UnreadableModFile {
+  fileName: string;
+  filePath: string;
+  size: number;
+  reason: string;
+  /** true = archiwum wygląda na złośliwe, a nie tylko uszkodzone. */
+  suspicious: boolean;
+}
+
+export type ModIssueSeverity = 'info' | 'warning' | 'error';
+
+/** Stabilne identyfikatory rodzajów problemów - bezpieczne do użycia w UI. */
+export type ModIssueCode =
+  | 'DUPLICATE_MOD_ID'
+  | 'MULTIPLE_VERSIONS'
+  | 'WRONG_LOADER'
+  | 'MISSING_DEPENDENCY'
+  | 'OPTIONAL_DEPENDENCY_MISSING'
+  | 'DEPENDENCY_VERSION_MISMATCH'
+  | 'DECLARED_CONFLICT'
+  | 'MC_VERSION_MISMATCH'
+  | 'CORRUPTED_JAR'
+  | 'NO_METADATA'
+  | 'SUSPICIOUS_ARCHIVE'
+  | 'DISABLED_MOD';
+
+export interface ModIssue {
+  severity: ModIssueSeverity;
+  code: ModIssueCode;
+  title: string;
+  description: string;
+  /** Plik, którego problem dotyczy w pierwszej kolejności. */
+  fileName: string;
+  /** Pozostałe pliki biorące udział w problemie (duplikaty, konflikty). */
+  relatedFiles: string[];
+  suggestedAction: string;
+}
+
+/** Kontekst instancji, względem którego oceniamy mody. */
+export interface ModAnalysisContext {
+  loader: LoaderId;
+  mcVersion: string;
+}
+
+export interface ModAnalysisReport {
+  instanceId?: string;
+  loader: LoaderId;
+  mcVersion: string;
+  scannedAt: number;
+  mods: LocalModMetadata[];
+  unreadable: UnreadableModFile[];
+  issues: ModIssue[];
+  summary: {
+    total: number;
+    enabled: number;
+    disabled: number;
+    withMetadata: number;
+    errors: number;
+    warnings: number;
+    infos: number;
+  };
+}
+
 /** Wynik operacji przekazywany przez IPC - nigdy nie rzucamy przez granicę IPC. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string; code?: string };

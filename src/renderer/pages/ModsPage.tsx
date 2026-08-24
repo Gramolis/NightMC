@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { call, formatBytes, formatNumber } from '../api.js';
 import { useSelectedInstance, useStore } from '../store/useStore.js';
 import { Banner, Button, Card, Chip, Empty, Modal } from '../components/UI.js';
-import { IconDownload, IconPuzzle, IconRefresh, IconSearch, IconTrash } from '../components/Icons.js';
-import type { ModFile, PackCatalogProject, PackCatalogVersion } from '../../shared/types.js';
+import { IconDownload, IconPuzzle, IconRefresh, IconSearch, IconTrash, IconWarn } from '../components/Icons.js';
+import type { ModAnalysisReport, ModFile, PackCatalogProject, PackCatalogVersion } from '../../shared/types.js';
 
 export function ModsPage() {
   const instance = useSelectedInstance();
@@ -20,6 +20,8 @@ export function ModsPage() {
   const [useModrinth, setUseModrinth] = useState(true);
   const [useCurseForge, setUseCurseForge] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<ModAnalysisReport | null>(null);
   const [updates, setUpdates] = useState<{
     fileName: string;
     currentName: string;
@@ -37,6 +39,7 @@ export function ModsPage() {
   useEffect(() => {
     void loadMods().catch(() => undefined);
     setUpdates([]);
+    setAnalysis(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id]);
 
@@ -102,6 +105,7 @@ export function ModsPage() {
       for (const reason of res.skipped) pushToast('error', `Pominięto: ${reason}`);
       setPicking(null);
       await loadMods();
+      setAnalysis(null);
     } catch (e) {
       pushToast('error', (e as Error).message);
     } finally {
@@ -121,12 +125,34 @@ export function ModsPage() {
         newVersionId: update.newVersionId,
       });
       setMods(next);
+      setAnalysis(null);
       setUpdates((current) => current.filter((item) => item.fileName !== update.fileName));
       pushToast('success', 'Mod został zaktualizowany, a stara wersja usunięta.');
     } catch (e) {
       pushToast('error', (e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const analyzeInstalled = async () => {
+    if (!instance) return;
+    setAnalyzing(true);
+    try {
+      const report = await call<ModAnalysisReport>('mods:analyze', { instanceId: instance.id });
+      setAnalysis(report);
+      pushToast(
+        report.summary.errors > 0 ? 'error' : report.summary.warnings > 0 ? 'info' : 'success',
+        report.summary.errors > 0
+          ? `Diagnostyka znalazła ${report.summary.errors} błędów.`
+          : report.summary.warnings > 0
+            ? `Diagnostyka znalazła ${report.summary.warnings} ostrzeżeń.`
+            : `Sprawdzono ${report.summary.total} plików — nie znaleziono problemów.`,
+      );
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -186,12 +212,51 @@ export function ModsPage() {
               >
                 <IconRefresh size={14} /> Sprawdź aktualizacje
               </Button>
+              <Button small variant="primary" disabled={analyzing} onClick={() => void analyzeInstalled()}>
+                <IconWarn size={14} /> {analyzing ? 'Analizuję…' : 'Sprawdź mody'}
+              </Button>
               <Button small variant="ghost" onClick={() => void call('app:openPath', { target: 'instances', instanceId: instance.id })}>
                 Katalog
               </Button>
             </>
           }
         >
+          {analysis && (
+            <div className="mod-analysis-panel">
+              <div className="row wrap mod-analysis-head">
+                <strong>Diagnostyka modów</strong>
+                <Chip tone="dim">przeskanowano {analysis.summary.total}</Chip>
+                <Chip tone="err">błędy {analysis.summary.errors}</Chip>
+                <Chip tone="warn">ostrzeżenia {analysis.summary.warnings}</Chip>
+                <Chip tone="cyan">informacje {analysis.summary.infos}</Chip>
+                <div className="spacer" />
+                <Button small variant="ghost" disabled={analyzing} onClick={() => void analyzeInstalled()}>
+                  <IconRefresh size={13} /> Sprawdź ponownie
+                </Button>
+              </div>
+
+              {analysis.issues.length === 0 ? (
+                <Banner kind="info">Nie znaleziono problemów w zainstalowanych modach.</Banner>
+              ) : (
+                <div className="mod-analysis-list">
+                  {analysis.issues.map((problem, index) => (
+                    <div className={`mod-analysis-issue ${problem.severity}`} key={`${problem.code}:${problem.fileName}:${index}`}>
+                      <IconWarn size={16} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="list-title">{problem.title}</div>
+                        <div className="list-sub">{problem.fileName} · {problem.description}</div>
+                        <div className="mod-analysis-action">{problem.suggestedAction}</div>
+                      </div>
+                      <Chip tone={problem.severity === 'error' ? 'err' : problem.severity === 'warning' ? 'warn' : 'cyan'}>
+                        {problem.severity === 'error' ? 'błąd' : problem.severity === 'warning' ? 'ostrzeżenie' : 'informacja'}
+                      </Chip>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {mods.length === 0 ? (
             <Empty title="Brak modów" hint="Przejdź do zakładki „Dodaj mody”, żeby dodać pierwszy mod." />
           ) : (
@@ -217,7 +282,7 @@ export function ModsPage() {
                       small
                       onClick={() =>
                         void call<ModFile[]>('mods:toggle', { instanceId: instance.id, fileName: mod.fileName })
-                          .then(setMods)
+                          .then((next) => { setMods(next); setAnalysis(null); })
                           .catch((e) => pushToast('error', (e as Error).message))
                       }
                     >
@@ -228,7 +293,7 @@ export function ModsPage() {
                       variant="danger"
                       onClick={() =>
                         void call<ModFile[]>('mods:delete', { instanceId: instance.id, fileName: mod.fileName })
-                          .then(setMods)
+                          .then((next) => { setMods(next); setAnalysis(null); })
                           .catch((e) => pushToast('error', (e as Error).message))
                       }
                     >

@@ -51,6 +51,7 @@ import { AuthError, getValidSession, isAuthConfigured, loginMicrosoft, refreshAc
 import { offlineSession } from './offline.js';
 import { addServer, getServer, listServers, pingServer, removeServer, updateServer } from './servers.js';
 import { checkModUpdates, deleteMod, installMod, listMods, projectVersions, searchMods, toggleMod, updateMod } from './mods.js';
+import { analyzeModsDirectory } from './mod-analyzer.js';
 import { exportMrpack, importPack, previewPack, repairPackFiles, setManualFile } from './packs.js';
 import {
   installCatalogModpack,
@@ -470,6 +471,14 @@ function registerHandlers(): void {
     const res = await installMod(instanceId, versionId, { withDependencies, onProgress: emitProgress });
     emit('event:instances-changed', null);
     return res;
+  });
+  on('mods:analyze', ({ instanceId }) => {
+    const instance = getInstance(instanceId);
+    return analyzeModsDirectory(
+      path.join(instance.dir, 'minecraft', 'mods'),
+      { loader: instance.loader, mcVersion: instance.mcVersion },
+      { instanceId },
+    );
   });
   on('mods:checkUpdates', async ({ instanceId }) => [
     ...(await checkModUpdates(instanceId)),

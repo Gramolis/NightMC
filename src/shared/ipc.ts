@@ -212,6 +212,8 @@ export const INVOKE_SCHEMAS = {
   }),
   'mods:install': v.object({ instanceId: id(), versionId: v.string({ max: 64, pattern: /^[A-Za-z0-9]{1,64}$/ }), withDependencies: v.optional(v.boolean()) }),
   'mods:checkUpdates': v.object({ instanceId: id() }),
+  /** Analiza lokalnych plików w minecraft/mods wybranej instancji (tylko odczyt). */
+  'mods:analyze': v.object({ instanceId: id() }),
   'mods:update': v.object({
     instanceId: id(),
     fileName: v.string({ pattern: FILENAME_PATTERN }),

@@ -469,6 +469,29 @@ a:hover { text-decoration: underline; }
 .chip.err { background: rgba(255, 106, 128, 0.12); color: var(--err); border-color: rgba(255, 106, 128, 0.26); }
 .chip.dim { background: rgba(255, 255, 255, 0.05); color: var(--text-faint); border-color: var(--border); }
 
+/* ------------------------------------------------ diagnostyka modów */
+
+.mod-analysis-panel {
+  margin-bottom: 16px;
+  padding: 13px;
+  border: 1px solid rgba(139, 108, 255, 0.24);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(139, 108, 255, 0.07), rgba(79, 227, 245, 0.025));
+}
+.mod-analysis-head { gap: 7px; margin-bottom: 11px; }
+.mod-analysis-list { display: grid; gap: 7px; max-height: 330px; overflow-y: auto; padding-right: 3px; }
+.mod-analysis-issue {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 11px; border-radius: 9px;
+  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.025);
+}
+.mod-analysis-issue.error { border-color: rgba(255, 106, 128, 0.28); background: rgba(255, 106, 128, 0.055); color: #ffc0ca; }
+.mod-analysis-issue.warning { border-color: rgba(255, 198, 92, 0.25); background: rgba(255, 198, 92, 0.045); color: #ffe0a3; }
+.mod-analysis-issue.info { border-color: rgba(79, 227, 245, 0.22); background: rgba(79, 227, 245, 0.04); color: #b6f0f8; }
+.mod-analysis-issue .list-title { color: currentColor; }
+.mod-analysis-issue .list-sub { margin-top: 3px; line-height: 1.45; overflow-wrap: anywhere; }
+.mod-analysis-action { margin-top: 5px; color: var(--text-dim); font-size: 11.5px; line-height: 1.45; }
+
 /* -------------------------------------------------------------- lista */
 
 .list { display: flex; flex-direction: column; gap: 8px; }
