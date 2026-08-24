@@ -218,6 +218,28 @@ export const INVOKE_SCHEMAS = {
   'packs:import': v.object({ previewToken: id(), instanceName: v.string({ min: 1, max: 64 }) }),
   'packs:exportMrpack': v.object({ instanceId: id() }),
   'packs:pickManualFile': v.object({ previewToken: id(), fileName: v.string({ max: 200 }) }),
+  'packBuilder:search': v.object({
+    query: v.string({ max: 200 }),
+    mcVersion: version(),
+    loader: v.literal('fabric', 'forge', 'neoforge'),
+    sources: v.array(v.literal('modrinth', 'curseforge'), { max: 2 }),
+  }),
+  'packBuilder:versions': v.object({
+    source: v.literal('modrinth', 'curseforge'),
+    projectId: v.string({ min: 1, max: 64, pattern: /^[A-Za-z0-9_-]+$/ }),
+    mcVersion: version(),
+    loader: v.literal('fabric', 'forge', 'neoforge'),
+  }),
+  'packBuilder:install': v.object({
+    instanceId: id(),
+    items: v.array(v.object({
+      source: v.literal('modrinth', 'curseforge'),
+      projectId: v.string({ min: 1, max: 64, pattern: /^[A-Za-z0-9_-]+$/ }),
+      versionId: v.string({ min: 1, max: 64, pattern: /^[A-Za-z0-9_-]+$/ }),
+      title: v.string({ min: 1, max: 200 }),
+      versionNumber: v.string({ min: 1, max: 128 }),
+    }), { max: 200 }),
+  }),
 
   /* --- Java --- */
   'java:detect': v.void(),

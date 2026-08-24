@@ -284,6 +284,44 @@ export interface ModrinthVersion {
   }[];
 }
 
+export type ModSource = 'modrinth' | 'curseforge';
+
+/** Wspólny wynik wyszukiwania używany przez kreator mieszanych paczek. */
+export interface PackCatalogProject {
+  source: ModSource;
+  projectId: string;
+  title: string;
+  description: string;
+  author?: string;
+  iconUrl?: string;
+  downloads: number;
+  /** CurseForge może zabronić instalacji przez klienta zewnętrznego. */
+  distributable: boolean;
+}
+
+export interface PackCatalogVersion {
+  source: ModSource;
+  projectId: string;
+  versionId: string;
+  name: string;
+  versionNumber: string;
+  fileName: string;
+  gameVersions: string[];
+  loaders: string[];
+  releaseType: 'release' | 'beta' | 'alpha';
+  size: number;
+  publishedAt: string;
+  downloadable: boolean;
+}
+
+export interface PackBuilderItem {
+  source: ModSource;
+  projectId: string;
+  versionId: string;
+  title: string;
+  versionNumber: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* Paczki                                                              */
 /* ------------------------------------------------------------------ */

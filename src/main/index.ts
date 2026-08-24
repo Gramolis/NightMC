@@ -52,6 +52,7 @@ import { offlineSession } from './offline.js';
 import { addServer, getServer, listServers, pingServer, removeServer, updateServer } from './servers.js';
 import { checkModUpdates, deleteMod, installMod, listMods, projectVersions, searchMods, toggleMod } from './mods.js';
 import { exportMrpack, importPack, previewPack, setManualFile } from './packs.js';
+import { installPackBuilderItems, packCatalogVersions, searchPackCatalog } from './pack-builder.js';
 import { launchGame, setLauncherVersion, stopAll, stopGame, runningGames } from './launcher.js';
 import { checkForUpdate, downloadUpdate, revealUpdate } from './updates.js';
 import { getNews } from './news.js';
@@ -504,6 +505,13 @@ function registerHandlers(): void {
     });
     if (res.canceled || !res.filePath) return null;
     return exportMrpack(instanceId, res.filePath);
+  });
+  on('packBuilder:search', (input) => searchPackCatalog(input));
+  on('packBuilder:versions', (input) => packCatalogVersions(input));
+  on('packBuilder:install', async ({ instanceId, items }) => {
+    const result = await installPackBuilderItems(instanceId, items, emitProgress);
+    emit('event:instances-changed', null);
+    return result;
   });
 
   /* --- Java --- */
