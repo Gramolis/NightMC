@@ -8,9 +8,308 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.modrinth.com https://textures.minecraft.net; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>NightMC</title>
+
+    <!--
+      =================================================================
+      NightMC - intro startowe (warstwa krytyczna)
+      =================================================================
+      Ten arkusz jest CELOWO wpisany w index.html, a nie w styles.css:
+      musi obowiązywać zanim przeglądarka pobierze bundle Reacta, żeby
+      okno od pierwszej klatki było ciemne i żeby animacja ruszyła
+      natychmiast - bez białego błysku i bez pustego ekranu.
+
+      To jedyne miejsce, w którym te reguły są zdefiniowane. Komponent
+      `components/StartupIntro.tsx` renderuje dokładnie ten sam znacznik
+      i te same klasy, więc po zamontowaniu Reacta obraz się nie zmienia.
+      Ten <style> zostaje w dokumencie na stałe - dlatego komponent nie
+      potrzebuje kopii reguł w styles.css.
+
+      Zgodność z CSP: tylko style (script-src pozostaje 'self', nie ma
+      tu ani jednej linijki JavaScriptu).
+
+      Oś czasu (przy --nm-s: 1, wartości w ms od startu):
+          60 -> 1010   "NightMC" wyłania się ze środka
+        1150 -> 1850   "Made by Krzychu" nadlatuje z góry
+        1850           kontakt: rozbłysk + fala energii
+        1850 -> 2750   "NightMC" odrzucony w dół, rozmywa się i znika
+        1850 -> 2370   "Made by Krzychu" odbija się i staje nad środkiem
+        2950 -> 3370   końcowy fioletowo-biały błysk
+        3400           koniec sekwencji (stała NM_INTRO_TOTAL_MS w TS)
+
+      `--nm-s`  - mnożnik tempa (0.42 przy prefers-reduced-motion),
+      `--nm-off`- przesunięcie osi czasu; React ustawia je na ujemną
+                  wartość równą już odtworzonemu czasowi, dzięki czemu
+                  komponent podejmuje animację dokładnie w tym miejscu,
+                  w którym zatrzymała się warstwa HTML.
+    -->
+    <style>
+      html, body { height: 100%; margin: 0; background: #05050c; }
+
+      .nm-intro {
+        --nm-s: 1;
+        --nm-off: 0ms;
+        position: fixed;
+        inset: 0;
+        z-index: 9000;
+        overflow: hidden;
+        background:
+          radial-gradient(1200px 680px at 76% -14%, rgba(96, 74, 200, 0.34), transparent 62%),
+          radial-gradient(900px 540px at 6% 110%, rgba(38, 92, 168, 0.24), transparent 60%),
+          linear-gradient(178deg, #080a16 0%, #05050c 52%, #04040a 100%);
+        font-family: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        color: #e9eaf6;
+        opacity: 1;
+        transition: opacity 520ms cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: opacity;
+        /* Zegar odniesienia: nic nie rysuje, służy tylko do odczytania
+           przez getAnimations(), ile czasu animacji już upłynęło. */
+        animation: nm-intro-clock 600s linear forwards;
+      }
+      .nm-intro.is-exiting { opacity: 0; pointer-events: none; }
+
+      @keyframes nm-intro-clock {
+        from { outline-color: transparent; }
+        to { outline-color: transparent; }
+      }
+
+      /* ---------------------------------------------------- tło i mgła */
+
+      .nm-intro__nebula {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(70px);
+        opacity: 0.5;
+        will-change: transform;
+      }
+      .nm-intro__nebula--a {
+        width: 46vmax; height: 46vmax; left: -10vmax; top: -14vmax;
+        background: radial-gradient(circle, rgba(122, 92, 255, 0.42), transparent 68%);
+        animation: nm-drift-a calc(22000ms * var(--nm-s)) ease-in-out infinite alternate;
+      }
+      .nm-intro__nebula--b {
+        width: 40vmax; height: 40vmax; right: -12vmax; bottom: -16vmax;
+        background: radial-gradient(circle, rgba(63, 208, 232, 0.28), transparent 68%);
+        animation: nm-drift-b calc(26000ms * var(--nm-s)) ease-in-out infinite alternate;
+      }
+      @keyframes nm-drift-a {
+        from { transform: translate3d(0, 0, 0) scale(1); }
+        to { transform: translate3d(6vmax, 4vmax, 0) scale(1.12); }
+      }
+      @keyframes nm-drift-b {
+        from { transform: translate3d(0, 0, 0) scale(1.08); }
+        to { transform: translate3d(-5vmax, -5vmax, 0) scale(1); }
+      }
+
+      .nm-intro__dust { position: absolute; inset: 0; }
+      .nm-intro__dust i {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        width: var(--sz);
+        height: var(--sz);
+        border-radius: 50%;
+        background: var(--c, #cfc6ff);
+        opacity: 0;
+        will-change: transform, opacity;
+        animation: nm-dust calc(var(--dur) * var(--nm-s)) ease-in-out infinite;
+        animation-delay: calc(var(--d) * var(--nm-s) + var(--nm-off));
+      }
+      @keyframes nm-dust {
+        0% { transform: translate3d(0, 12px, 0) scale(0.6); opacity: 0; }
+        35% { opacity: 0.85; }
+        100% { transform: translate3d(0, -46px, 0) scale(1); opacity: 0; }
+      }
+
+      /* ------------------------------------------------------- scena */
+
+      .nm-intro__stage {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+      }
+      .nm-intro__stage > * { grid-area: 1 / 1; }
+
+      /* --- "NightMC": warstwa zewnętrzna = odrzucenie w dół --------- */
+      .nm-intro__title {
+        opacity: 1;
+        will-change: transform, opacity, filter;
+        animation: nm-title-knock calc(900ms * var(--nm-s)) cubic-bezier(0.55, 0, 0.85, 0.3) both;
+        animation-delay: calc(1850ms * var(--nm-s) + var(--nm-off));
+      }
+      /* --- "NightMC": warstwa wewnętrzna = wyłonienie ze środka ----- */
+      .nm-intro__title-inner {
+        display: block;
+        font-size: clamp(42px, 8.6vw, 118px);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        line-height: 1.05;
+        white-space: nowrap;
+        background: linear-gradient(112deg, #ffffff 0%, #cbb8ff 42%, #7fe6f7 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow:
+          0 0 26px rgba(139, 108, 255, 0.55),
+          0 0 62px rgba(79, 227, 245, 0.28);
+        will-change: transform, opacity, filter;
+        animation: nm-title-rise calc(950ms * var(--nm-s)) cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation-delay: calc(60ms * var(--nm-s) + var(--nm-off));
+      }
+      @keyframes nm-title-rise {
+        0% { opacity: 0; transform: scale(0.42); filter: blur(16px); }
+        45% { opacity: 0.85; }
+        100% { opacity: 1; transform: scale(1); filter: blur(0); }
+      }
+      @keyframes nm-title-knock {
+        0% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); opacity: 1; filter: blur(0); }
+        14% { transform: translate3d(0, 3vh, 0) scale(0.99) rotate(1.2deg); opacity: 1; filter: blur(1px); }
+        100% { transform: translate3d(0, 128vh, 0) scale(0.72) rotate(9deg); opacity: 0; filter: blur(13px); }
+      }
+
+      /* --- "Made by Krzychu": nadlot z góry, kontakt, wyhamowanie --- */
+      .nm-intro__author {
+        font-size: clamp(19px, 3.3vw, 44px);
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        white-space: nowrap;
+        color: #f2eeff;
+        text-shadow:
+          0 0 20px rgba(150, 118, 255, 0.6),
+          0 0 48px rgba(79, 227, 245, 0.3);
+        will-change: transform, opacity, filter;
+        animation: nm-author-fly calc(1220ms * var(--nm-s)) cubic-bezier(0.3, 0.85, 0.3, 1) both;
+        animation-delay: calc(1150ms * var(--nm-s) + var(--nm-off));
+      }
+      @keyframes nm-author-fly {
+        0% { transform: translate3d(0, -62vh, 0) scale(0.78); opacity: 0; filter: blur(8px); }
+        22% { opacity: 1; filter: blur(2px); }
+        /* 57.4% = 1850 ms -> kontakt: "Made by Krzychu" trafia w GÓRNĄ część
+           napisu "NightMC". Napisy nie siadają na wspólnej linii bazowej,
+           więc uderzenie jest czytelne, a nie zamazane. */
+        57.4% { transform: translate3d(0, -6vh, 0) scale(1.12); opacity: 1; filter: blur(0); }
+        /* odbicie w górę - "NightMC" odlatuje w dół, napis autora się cofa */
+        68% { transform: translate3d(0, -9.5vh, 0) scale(0.99); }
+        100% { transform: translate3d(0, -7.5vh, 0) scale(1); opacity: 1; filter: blur(0); }
+      }
+
+      /* --- fala energii w momencie kontaktu ------------------------ */
+      .nm-intro__shock {
+        width: min(62vw, 460px);
+        height: min(62vw, 460px);
+        border-radius: 50%;
+        border: 2px solid rgba(176, 152, 255, 0.75);
+        box-shadow:
+          0 0 60px rgba(139, 108, 255, 0.45),
+          inset 0 0 60px rgba(79, 227, 245, 0.25);
+        opacity: 0;
+        pointer-events: none;
+        will-change: transform, opacity;
+        animation: nm-shock calc(640ms * var(--nm-s)) cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: calc(1850ms * var(--nm-s) + var(--nm-off));
+      }
+      @keyframes nm-shock {
+        0% { transform: scale(0.12); opacity: 0; }
+        18% { opacity: 0.95; }
+        100% { transform: scale(1.5); opacity: 0; }
+      }
+
+      /* --- rozbłysk kontaktu + końcowy błysk ----------------------- */
+      .nm-intro__spark,
+      .nm-intro__flash {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0;
+        will-change: opacity;
+      }
+      .nm-intro__spark {
+        background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85), rgba(150, 118, 255, 0.28) 26%, transparent 52%);
+        animation: nm-spark calc(340ms * var(--nm-s)) ease-out both;
+        animation-delay: calc(1800ms * var(--nm-s) + var(--nm-off));
+      }
+      @keyframes nm-spark {
+        0% { opacity: 0; }
+        16% { opacity: 0.9; }
+        100% { opacity: 0; }
+      }
+      .nm-intro__flash {
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(167, 138, 255, 0.86) 55%, rgba(126, 224, 245, 0.7));
+        animation: nm-flash calc(420ms * var(--nm-s)) ease-in-out both;
+        animation-delay: calc(2950ms * var(--nm-s) + var(--nm-off));
+      }
+      @keyframes nm-flash {
+        0% { opacity: 0; }
+        34% { opacity: 0.72; }
+        100% { opacity: 0; }
+      }
+
+      /* --- komunikat pokazywany dopiero, gdy bootstrap trwa dłużej -- */
+      .nm-intro__status {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: clamp(38px, 9vh, 96px);
+        margin: 0;
+        text-align: center;
+        font-size: 13px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: #9aa0c0;
+        opacity: 0;
+        will-change: opacity;
+        animation: nm-status calc(2600ms * var(--nm-s)) ease-in-out infinite;
+        animation-delay: calc(3400ms * var(--nm-s) + var(--nm-off));
+      }
+      @keyframes nm-status {
+        0% { opacity: 0; }
+        10% { opacity: 0.9; }
+        55% { opacity: 0.42; }
+        100% { opacity: 0.9; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .nm-intro { --nm-s: 0.42; }
+        .nm-intro__nebula { animation: none; }
+        .nm-intro__dust { display: none; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Warstwa startowa widoczna natychmiast, jeszcze przed bundlem Reacta.
+         StartupIntro.tsx renderuje identyczny znacznik i usuwa ten węzeł
+         w useLayoutEffect, czyli przed pierwszym malowaniem - bez przeskoku. -->
+    <div id="boot-intro" class="nm-intro" role="status" aria-live="polite">
+      <span class="nm-intro__nebula nm-intro__nebula--a" aria-hidden="true"></span>
+      <span class="nm-intro__nebula nm-intro__nebula--b" aria-hidden="true"></span>
+      <div class="nm-intro__dust" aria-hidden="true">
+        <i style="--x: 12%; --y: 74%; --sz: 2px; --d: 0ms; --dur: 5200ms; --c: #cfc6ff"></i>
+        <i style="--x: 26%; --y: 88%; --sz: 3px; --d: 700ms; --dur: 6100ms; --c: #a8b6ff"></i>
+        <i style="--x: 38%; --y: 66%; --sz: 2px; --d: 1500ms; --dur: 4800ms; --c: #8ff0ff"></i>
+        <i style="--x: 51%; --y: 92%; --sz: 2px; --d: 400ms; --dur: 5600ms; --c: #cfc6ff"></i>
+        <i style="--x: 63%; --y: 70%; --sz: 3px; --d: 2100ms; --dur: 6400ms; --c: #b9a7ff"></i>
+        <i style="--x: 74%; --y: 84%; --sz: 2px; --d: 1100ms; --dur: 5000ms; --c: #8ff0ff"></i>
+        <i style="--x: 86%; --y: 62%; --sz: 2px; --d: 2600ms; --dur: 5800ms; --c: #cfc6ff"></i>
+        <i style="--x: 8%; --y: 40%; --sz: 2px; --d: 3000ms; --dur: 6600ms; --c: #a8b6ff"></i>
+        <i style="--x: 92%; --y: 34%; --sz: 2px; --d: 1800ms; --dur: 6000ms; --c: #b9a7ff"></i>
+        <i style="--x: 19%; --y: 20%; --sz: 2px; --d: 2400ms; --dur: 7000ms; --c: #8ff0ff"></i>
+        <i style="--x: 68%; --y: 16%; --sz: 2px; --d: 900ms; --dur: 6800ms; --c: #cfc6ff"></i>
+        <i style="--x: 45%; --y: 28%; --sz: 2px; --d: 3400ms; --dur: 5400ms; --c: #a8b6ff"></i>
+      </div>
+
+      <div class="nm-intro__stage">
+        <span class="nm-intro__shock" aria-hidden="true"></span>
+        <span class="nm-intro__title"><span class="nm-intro__title-inner">NightMC</span></span>
+        <span class="nm-intro__author">Made by Krzychu</span>
+      </div>
+
+      <span class="nm-intro__spark" aria-hidden="true"></span>
+      <span class="nm-intro__flash" aria-hidden="true"></span>
+      <p class="nm-intro__status">Ładowanie NightMC…</p>
+    </div>
+
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>

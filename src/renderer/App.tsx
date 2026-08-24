@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StarField } from './components/StarField.js';
 import { Sidebar } from './components/Sidebar.js';
 import { installEventBridge, useStore } from './store/useStore.js';
@@ -16,7 +16,7 @@ import { JavaPage } from './pages/JavaPage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
 import { LogsPage } from './pages/LogsPage.js';
 import { AboutPage } from './pages/AboutPage.js';
-import { Logo } from './components/Logo.js';
+import { StartupIntro } from './components/StartupIntro.js';
 
 const PAGES = {
   home: HomePage,
@@ -41,6 +41,10 @@ export function App() {
   const dismissToast = useStore((s) => s.dismissToast);
   const bootstrap = useStore((s) => s.bootstrap);
 
+  /** Intro jest nakładką: bootstrap leci równolegle i nic go nie blokuje. */
+  const [introDone, setIntroDone] = useState(false);
+  const handleIntroFinish = useCallback(() => setIntroDone(true), []);
+
   useEffect(() => {
     const off = installEventBridge();
     void bootstrap();
@@ -52,21 +56,19 @@ export function App() {
   return (
     <>
       <StarField />
-      {!ready ? (
-        <div style={{ position: 'relative', zIndex: 1, display: 'grid', placeItems: 'center', height: '100vh' }}>
-          <div style={{ textAlign: 'center' }}>
-            <Logo size={84} />
-            <p style={{ color: 'var(--text-dim)', marginTop: 18, letterSpacing: 2 }}>NIGHTMC</p>
-          </div>
-        </div>
-      ) : (
-        <div className="app">
+      {/* Menu montuje się od razu po zakończeniu bootstrapu - jeszcze pod
+          nieprzezroczystą nakładką intro. Dzięki temu w chwili odsłonięcia
+          jest już gotowe i nie widać ani migania, ani przeskoku układu. */}
+      {ready && (
+        <div className={`app${introDone ? '' : ' app--revealing'}`}>
           <Sidebar />
           <main className="main">
             <Page />
           </main>
         </div>
       )}
+
+      {!introDone && <StartupIntro ready={ready} onFinish={handleIntroFinish} />}
 
       <div className="toasts">
         {toasts.map((t) => (

@@ -775,3 +775,23 @@ a:hover { text-decoration: underline; }
 .changelog-paragraph {
   padding: 3px 5px;
 }
+
+/* ------------------------------------------------- intro startowe */
+/* Uwaga: cały arkusz animacji intro (.nm-intro*) mieszka w
+   `src/renderer/index.html` w znaczniku <style>. Musi obowiązywać zanim
+   przeglądarka pobierze ten plik, inaczej pierwsza klatka byłaby pusta.
+   Tutaj zostaje wyłącznie to, co dotyczy odsłaniania menu pod nakładką. */
+
+.app--revealing {
+  animation: nm-app-reveal 460ms var(--ease) both;
+}
+
+@keyframes nm-app-reveal {
+  from { opacity: 0; transform: scale(0.988); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app--revealing { animation-duration: 200ms; }
+  .app--revealing { transform: none; }
+}
