@@ -17,6 +17,7 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 ### Zmieniono
 
 - Publiczne wydania zawierają teraz instalator zamiast przenośnego EXE, a aktualizator NightMC pobiera i weryfikuje instalator kolejnej wersji.
+- Po zatwierdzeniu aktualizacji NightMC automatycznie zamyka się, podmienia pliki przez zweryfikowany instalator i uruchamia nową wersję.
 
 ### Naprawiono
 

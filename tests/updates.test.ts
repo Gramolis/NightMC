@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'node:crypto';
-import { compareVersions, selectUpdateAssets, verifySignature } from '../src/main/updates.js';
+import { compareVersions, NSIS_UPDATE_ARGS, selectUpdateAssets, verifySignature } from '../src/main/updates.js';
 import { parseNews, sanitizeUrl } from '../src/main/news.js';
 
 describe('porównywanie wersji', () => {
@@ -48,6 +48,10 @@ describe('pliki wydania aktualizacji', () => {
     expect(selected.executable?.name).toBe('NightMC.exe');
     expect(selected.checksum?.name).toBe('NightMC.exe.sha256');
     expect(selected.assetType).toBe('portable');
+  });
+
+  it('uruchamia instalator cicho i ponownie startuje NightMC', () => {
+    expect(NSIS_UPDATE_ARGS).toEqual(['--updated', '/S', '--force-run']);
   });
 });
 

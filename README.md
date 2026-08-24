@@ -163,7 +163,8 @@ NightMC odpytuje `https://api.github.com/repos/<repo>/releases/latest` i szuka w
 | `NightMC-Setup.exe.sig` | podpis Ed25519 (opcjonalny) |
 
 Publiczne wydania nie zawierają już przenośnego `NightMC.exe`. Nowy użytkownik pobiera instalator,
-a kolejne wersje NightMC pobiera z poziomu launchera i po weryfikacji pokazuje instalator do uruchomienia.
+a kolejne wersje NightMC pobiera z poziomu launchera. Po weryfikacji launcher uruchamia Setup w trybie
+cichym, zamyka starą wersję, podmienia jej pliki i uruchamia NightMC ponownie.
 Starsze wydania z `NightMC.exe` pozostają obsługiwane awaryjnie.
 
 Aby włączyć weryfikację podpisu:

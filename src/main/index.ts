@@ -64,7 +64,7 @@ import {
   updateCurseForgeMod,
 } from './pack-builder.js';
 import { launchGame, setLauncherVersion, stopAll, stopGame, runningGames } from './launcher.js';
-import { checkForUpdate, downloadUpdate, revealUpdate } from './updates.js';
+import { checkForUpdate, downloadUpdate, launchInstallerUpdate, revealUpdate } from './updates.js';
 import { getNews } from './news.js';
 import { getChangelog } from './changelog.js';
 import { deleteSecret, SECRET_KEYS, secretsBackend, setSecret } from './secrets.js';
@@ -714,8 +714,15 @@ function registerHandlers(): void {
     const info = await checkForUpdate();
     if (!info.available) return { downloaded: false, reason: 'Masz najnowszą wersję.' };
     const result = await downloadUpdate(info, emitProgress);
+    if (info.assetType === 'installer') {
+      await launchInstallerUpdate(result.file);
+      // Daj rendererowi chwilę na odebranie odpowiedzi. Instalator NSIS zaczeka,
+      // aż proces zwolni pliki, po czym podmieni je i uruchomi NightMC ponownie.
+      setTimeout(() => app.quit(), 600);
+      return { downloaded: true, installing: true, file: result.file, signatureValid: result.signatureValid };
+    }
     revealUpdate(result.file);
-    return { downloaded: true, file: result.file, signatureValid: result.signatureValid };
+    return { downloaded: true, installing: false, file: result.file, signatureValid: result.signatureValid };
   });
   on('news:get', () => getNews());
   on('changelog:get', ({ refresh }) => getChangelog(refresh));

@@ -7,16 +7,17 @@
  *  - preferujemy instalator `NightMC-Setup.exe` i weryfikujemy jego SHA-256,
  *  - starsze wydania z portable `NightMC.exe` pozostają obsługiwane awaryjnie,
  *  - opcjonalnie weryfikujemy podpis Ed25519 (w EXE jest TYLKO klucz publiczny),
- *  - użytkownik zatwierdza aktualizację ręcznie,
+ *  - instalacja rusza dopiero po kliknięciu użytkownika w launcherze,
  *  - NightMC NIGDY nie wykonuje skryptu pobranego z sieci.
  *
- * Po weryfikacji otwieramy katalog z instalatorem. Użytkownik nadal sam zatwierdza
- * jego uruchomienie, więc pobrany plik nigdy nie wykonuje się bez wiedzy gracza.
+ * Po weryfikacji uruchamiamy podpisany instalator NSIS w trybie cichym. NightMC
+ * zamyka się, instalator podmienia pliki i ponownie uruchamia aplikację.
  */
 
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { app, shell } from 'electron';
 import { ENDPOINTS } from '../shared/constants.js';
 import { fetchJson } from './net.js';
@@ -168,6 +169,9 @@ export interface DownloadedUpdate {
   signatureValid: boolean | null;
 }
 
+/** Parametry zgodne z mechanizmem aktualizacji NSIS electron-builder. */
+export const NSIS_UPDATE_ARGS = ['--updated', '/S', '--force-run'] as const;
+
 /** Pobiera i weryfikuje nową wersję. Nie uruchamia jej samodzielnie. */
 export async function downloadUpdate(
   info: UpdateInfo,
@@ -216,7 +220,34 @@ export async function downloadUpdate(
   return { file: dest, sha256: actual, signatureValid };
 }
 
-/** Pokazuje zweryfikowany instalator w Eksploratorze; uruchomienie zatwierdza użytkownik. */
+/**
+ * Uruchamia zweryfikowany instalator w trybie cichym. `--force-run` sprawia,
+ * że po podmianie plików nowa wersja NightMC uruchomi się ponownie.
+ */
+export async function launchInstallerUpdate(file: string): Promise<void> {
+  if (process.platform !== 'win32') throw new Error('Automatyczna instalacja aktualizacji jest dostępna tylko w Windows.');
+  const stat = await fsp.stat(file).catch(() => null);
+  if (!stat?.isFile() || path.extname(file).toLowerCase() !== '.exe') {
+    throw new Error('Nie znaleziono zweryfikowanego instalatora aktualizacji.');
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(file, [...NSIS_UPDATE_ARGS], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      shell: false,
+    });
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
+    child.once('error', reject);
+  });
+  log.info(`Uruchomiono zweryfikowany instalator aktualizacji: ${file}`);
+}
+
+/** Wariant awaryjny dla starych wydań portable. */
 export function revealUpdate(file: string): void {
   shell.showItemInFolder(file);
 }

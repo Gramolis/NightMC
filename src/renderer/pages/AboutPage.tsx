@@ -43,6 +43,7 @@ export function AboutPage() {
   const { system, update, progress, pushToast } = useStore();
   const [licenses, setLicenses] = useState<{ libraries: LicenseEntry[]; sources: LicenseEntry[] } | null>(null);
   const [checking, setChecking] = useState(false);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
   const [info, setInfo] = useState<UpdateInfo | null>(update);
   const [tab, setTab] = useState<'update' | 'changelog' | 'network' | 'licenses' | 'legal'>('update');
   const [changelog, setChangelog] = useState<ChangelogDocument | null>(null);
@@ -66,6 +67,26 @@ export function AboutPage() {
   }, [tab]);
 
   const open = (url: string) => void call('app:openExternal', { url }).catch(() => undefined);
+
+  const installAvailableUpdate = () => {
+    setInstallingUpdate(true);
+    void call<{ downloaded: boolean; installing?: boolean; file?: string }>('updates:download')
+      .then((result) => {
+        if (result.installing) {
+          pushToast('success', 'Aktualizacja zweryfikowana. NightMC zamknie się, podmieni pliki i uruchomi ponownie.');
+        } else if (result.downloaded) {
+          pushToast('success', `Pobrano i zweryfikowano: ${result.file}`);
+          setInstallingUpdate(false);
+        } else {
+          pushToast('success', 'Masz najnowszą wersję.');
+          setInstallingUpdate(false);
+        }
+      })
+      .catch((e) => {
+        pushToast('error', (e as Error).message);
+        setInstallingUpdate(false);
+      });
+  };
 
   return (
     <div className="fade-in">
@@ -114,13 +135,10 @@ export function AboutPage() {
               {info?.available && (
                 <Button
                   variant="primary"
-                  onClick={() =>
-                    void call<{ downloaded: boolean; file?: string }>('updates:download')
-                      .then((r) => pushToast('success', r.downloaded ? `Pobrano i zweryfikowano: ${r.file}` : 'Masz najnowszą wersję.'))
-                      .catch((e) => pushToast('error', (e as Error).message))
-                  }
+                  disabled={installingUpdate}
+                  onClick={installAvailableUpdate}
                 >
-                  <IconDownload size={15} /> Pobierz aktualizację
+                  <IconDownload size={15} /> {installingUpdate ? 'Aktualizuję…' : 'Pobierz i zainstaluj'}
                 </Button>
               )}
               {info?.htmlUrl && <Button variant="ghost" onClick={() => open(info.htmlUrl!)}>Zobacz wydanie</Button>}
@@ -130,9 +148,9 @@ export function AboutPage() {
 
             <div style={{ marginTop: 16 }}>
               <Banner kind="info">
-                Instalator jest pobierany po HTTPS do katalogu tymczasowego i weryfikowany sumą SHA-256
-                (oraz podpisem Ed25519, jeśli wydanie go zawiera). Po weryfikacji NightMC otworzy katalog
-                z bezpiecznym instalatorem — jego uruchomienie nadal zatwierdzasz samodzielnie.
+                Instalator jest pobierany po HTTPS i weryfikowany sumą SHA-256 oraz opcjonalnym podpisem Ed25519.
+                Po weryfikacji NightMC automatycznie zamknie się, podmieni pliki i uruchomi nową wersję. Twoje
+                instancje, konta, ustawienia, mody i światy pozostają w katalogu danych i nie są usuwane.
               </Banner>
             </div>
           </Card>
