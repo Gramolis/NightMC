@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "id": "news-1-0-3",
+      "title": "NightMC 1.0.3",
+      "description": "Ulepszony import paczek CurseForge ZIP: automatyczna instancja, poprawne wczytywanie folderów mods i overrides, czytelne błędy oraz changelog z GitHuba.",
+      "url": "https://github.com/Gramolis/NightMC/releases/tag/v1.0.3",
+      "publishedAt": "2026-08-24T20:45:38Z"
+    },
+    {
       "id": "news-1-0-1",
       "title": "NightMC 1.0.1",
       "description": "Nowy katalog paczek Modrinth i CurseForge, edycja modów, naprawa paczek i Forge oraz automatyczny suwak RAM.",

@@ -5,19 +5,24 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ## [Unreleased]
 
-- Dodano czerwony przycisk „Anuluj” przy imporcie paczki, który zamyka podgląd i czyści wybrany plik bez tworzenia instancji.
-- Poprawiono import ZIP-ów CurseForge zawierających `mods/`, `config/` i pozostałą zawartość bezpośrednio w katalogu głównym archiwum — pliki trafiają teraz do utworzonej instancji tak samo jak zawartość z `overrides/`.
+## [1.0.3] — 2026-08-24
 
 ### Dodano
 
 - Wbudowany ekran changeloga w NightMC, automatycznie synchronizowany z `CHANGELOG.md` na GitHubie.
 - Ręczne odświeżanie changeloga oraz zapisaną kopię używaną przy braku internetu.
 - Automatyczne tworzenie kompletnej instancji z lokalnego ZIP-a CurseForge na podstawie wersji gry i loadera z manifestu.
+- Czerwony przycisk „Anuluj” przy imporcie paczki, który zamyka podgląd i czyści wybrany plik bez tworzenia instancji.
 
 ### Zmieniono
 
 - Import ZIP nie tworzy już pustej instancji, gdy brakuje klucza CurseForge lub ręcznie wskazanych modów.
 - Archiwa bez manifestu, loadera albo zawartości modów pokazują trwałą instrukcję ręcznego utworzenia instancji i skopiowania folderów `mods` oraz `config`.
+
+### Naprawiono
+
+- Import ZIP-ów CurseForge zawierających `mods/`, `config` i pozostałą zawartość bezpośrednio w katalogu głównym archiwum.
+- Wczytywanie dołączonych modów zarówno z `mods/`, jak i `overrides/mods/`, także gdy nazwa folderu używa wielkich liter.
 
 ## [1.0.1] — 2026-08-24
 
@@ -61,6 +66,7 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 - Aktualizacje i aktualności z repozytorium GitHub.
 - Logi, diagnostykę uruchomienia, kopie zapasowe i eksport instancji.
 
-[Unreleased]: https://github.com/Gramolis/NightMC/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Gramolis/NightMC/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/Gramolis/NightMC/compare/v1.0.1...v1.0.3
 [1.0.1]: https://github.com/Gramolis/NightMC/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Gramolis/NightMC/releases/tag/v1.0.0
