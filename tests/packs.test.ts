@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   detectPackKind,
+  extractCurseForgeContent,
   loaderFromCurseForgeId,
   loaderFromMrpackDeps,
   parseCurseForgeManifest,
@@ -203,6 +204,35 @@ describe('CurseForge', () => {
     const preview = previewCurseForge(file);
     expect(preview.requiredFiles).toHaveLength(0);
     expect(preview.warnings.join(' ')).toContain('1 dołączonych modów');
+  });
+
+  it('rozpakowuje mody zarówno z overrides, jak i głównego folderu mods', async () => {
+    const file = writeZip({
+      'manifest.json': JSON.stringify({ ...CF_MANIFEST, files: [] }),
+      'overrides/mods/z-overrides.jar': 'override',
+      'overrides/config/paczka.toml': 'config',
+      'mods/z-katalogu-glownego.jar': 'root',
+    });
+    const gameDir = path.join(tmp, 'minecraft');
+
+    const result = await extractCurseForgeContent(file, gameDir, 'overrides');
+
+    expect(result.files).toBe(3);
+    expect(await fsp.readFile(path.join(gameDir, 'mods', 'z-overrides.jar'), 'utf8')).toBe('override');
+    expect(await fsp.readFile(path.join(gameDir, 'mods', 'z-katalogu-glownego.jar'), 'utf8')).toBe('root');
+    expect(await fsp.readFile(path.join(gameDir, 'config', 'paczka.toml'), 'utf8')).toBe('config');
+  });
+
+  it('obsługuje wielkie litery w głównym folderze Mods', async () => {
+    const file = writeZip({
+      'manifest.json': JSON.stringify({ ...CF_MANIFEST, files: [] }),
+      'Mods/example.jar': 'jar',
+    });
+    const gameDir = path.join(tmp, 'minecraft-case');
+
+    await extractCurseForgeContent(file, gameDir, 'overrides');
+
+    expect(await fsp.readFile(path.join(gameDir, 'mods', 'example.jar'), 'utf8')).toBe('jar');
   });
 });
 

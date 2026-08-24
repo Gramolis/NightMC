@@ -5,6 +5,8 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ## [Unreleased]
 
+- Poprawiono import ZIP-ów CurseForge zawierających `mods/`, `config/` i pozostałą zawartość bezpośrednio w katalogu głównym archiwum — pliki trafiają teraz do utworzonej instancji tak samo jak zawartość z `overrides/`.
+
 ### Dodano
 
 - Wbudowany ekran changeloga w NightMC, automatycznie synchronizowany z `CHANGELOG.md` na GitHubie.

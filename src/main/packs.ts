@@ -467,6 +467,56 @@ interface CurseForgeFileInfo {
   data: { id: number; displayName: string; fileName: string; downloadUrl: string | null; fileLength: number; hashes: { value: string; algo: number }[] };
 }
 
+const CURSEFORGE_ROOT_CONTENT_DIRS = [
+  'mods',
+  'config',
+  'defaultconfigs',
+  'resourcepacks',
+  'shaderpacks',
+  'kubejs',
+  'scripts',
+] as const;
+
+/**
+ * Rozpakowuje zawartość dołączoną bezpośrednio do eksportu CurseForge.
+ *
+ * Oficjalne eksporty zwykle trzymają ją w `overrides/`, ale część narzędzi
+ * tworzy ZIP-y z `mods/`, `config/` itd. w katalogu głównym. Podgląd już je
+ * rozpoznawał, więc import również musi obsłużyć oba układy.
+ */
+export async function extractCurseForgeContent(
+  zipFile: string,
+  gameDir: string,
+  overridesDir = 'overrides',
+): Promise<{ files: number; bytes: number }> {
+  let files = 0;
+  let bytes = 0;
+
+  const add = (result: { files: number; bytes: number }): void => {
+    files += result.files;
+    bytes += result.bytes;
+  };
+
+  add(await extractArchive(zipFile, gameDir, { stripPrefix: overridesDir, overwrite: true }));
+
+  const rootNames = new Map<string, string>();
+  for (const entry of new AdmZip(zipFile).getEntries()) {
+    const first = entry.entryName.replace(/\\/g, '/').split('/')[0];
+    if (first) rootNames.set(first.toLowerCase(), first);
+  }
+
+  for (const dir of CURSEFORGE_ROOT_CONTENT_DIRS) {
+    const archiveDir = rootNames.get(dir);
+    if (!archiveDir || archiveDir.toLowerCase() === overridesDir.toLowerCase()) continue;
+    add(await extractArchive(zipFile, path.join(gameDir, dir), {
+      stripPrefix: archiveDir,
+      overwrite: true,
+    }));
+  }
+
+  return { files, bytes };
+}
+
 /** Pobiera metadane pliku przez API CurseForge - tylko z WŁASNYM kluczem użytkownika. */
 async function curseForgeFileInfo(projectId: number, fileId: number, apiKey: string): Promise<CurseForgeFileInfo['data'] | null> {
   try {
@@ -518,7 +568,7 @@ async function importCurseForge(
   );
 
   const gameDir = path.join(instance.dir, 'minecraft');
-  await extractArchive(zipFile, gameDir, { stripPrefix: manifest.overrides ?? 'overrides', overwrite: true });
+  await extractCurseForgeContent(zipFile, gameDir, manifest.overrides ?? 'overrides');
 
   // 1. Ręcznie wskazane pliki kopiujemy do mods/.
   const modsTarget = path.join(gameDir, 'mods');
