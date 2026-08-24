@@ -203,6 +203,14 @@ export function PacksPage() {
     }
   };
 
+  const cancelImport = () => {
+    setToken('');
+    setPreview(null);
+    setName('');
+    setManual({});
+    setPackError('');
+  };
+
   const missingManualFiles = preview?.kind === 'curseforge'
     ? preview.requiredFiles.filter((file) => !manual[file.name]).length
     : 0;
@@ -465,9 +473,14 @@ export function PacksPage() {
               </div>
             )}
 
-            <Button variant="primary" onClick={() => void doImport()} disabled={busy || !name.trim() || !curseForgeReady}>
-              <IconDownload size={16} /> {busy ? 'Importuję…' : 'Importuj jako instancję'}
-            </Button>
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Button variant="primary" onClick={() => void doImport()} disabled={busy || !name.trim() || !curseForgeReady}>
+                <IconDownload size={16} /> {busy ? 'Importuję…' : 'Importuj jako instancję'}
+              </Button>
+              <Button variant="danger" onClick={cancelImport} disabled={busy}>
+                Anuluj
+              </Button>
+            </div>
           </Card>
         )}
       </div>

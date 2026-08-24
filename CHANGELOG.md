@@ -5,6 +5,7 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ## [Unreleased]
 
+- Dodano czerwony przycisk „Anuluj” przy imporcie paczki, który zamyka podgląd i czyści wybrany plik bez tworzenia instancji.
 - Poprawiono import ZIP-ów CurseForge zawierających `mods/`, `config/` i pozostałą zawartość bezpośrednio w katalogu głównym archiwum — pliki trafiają teraz do utworzonej instancji tak samo jak zawartość z `overrides/`.
 
 ### Dodano
