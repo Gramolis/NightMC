@@ -1,6 +1,6 @@
 /** Strona główna: aktywny profil, wybrana instancja, przycisk GRAJ, postęp, aktualności. */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { call, formatDate, formatPlayTime } from '../api.js';
 import { useActiveAccount, useSelectedInstance, useStore } from '../store/useStore.js';
 import { Banner, Button, Card, Chip, DownloadPanel, Empty, Modal, Stat } from '../components/UI.js';

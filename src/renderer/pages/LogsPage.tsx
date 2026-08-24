@@ -7,7 +7,7 @@ import { Button, Card, Chip } from '../components/UI.js';
 import { IconCopy, IconDownload, IconTrash } from '../components/Icons.js';
 
 export function LogsPage() {
-  const { logs, instances, selectedInstanceId, selectInstance, refreshLogs, pushToast } = useStore();
+  const { logs, instances, selectInstance, refreshLogs, pushToast } = useStore();
   const [scope, setScope] = useState<string>('launcher');
   const [filter, setFilter] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);

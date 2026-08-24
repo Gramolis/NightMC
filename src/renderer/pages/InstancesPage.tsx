@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { call, formatDate, formatPlayTime } from '../api.js';
 import { useStore } from '../store/useStore.js';
-import { Banner, Button, Card, Chip, ConfirmModal, Empty, Field, Modal, Stat } from '../components/UI.js';
+import { Banner, Button, Chip, ConfirmModal, Empty, Field, Modal, Stat } from '../components/UI.js';
 import { IconEdit, IconFolder, IconGrid, IconMoon, IconPlus, IconRefresh, IconTrash } from '../components/Icons.js';
 import type { Instance } from '../../shared/types.js';
 

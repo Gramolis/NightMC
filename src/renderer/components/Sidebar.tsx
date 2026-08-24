@@ -1,6 +1,7 @@
 /** Nawigacja boczna. */
 
 import { Logo } from './Logo.js';
+import { call } from '../api.js';
 import { useStore, type PageId } from '../store/useStore.js';
 import {
   IconCpu, IconGrid, IconHome, IconInfo, IconLayers, IconPackage, IconPlus,
@@ -50,24 +51,36 @@ export function Sidebar() {
         </div>
       </div>
 
-      {ENTRIES.map((entry) => {
-        const showGroup = entry.group !== lastGroup;
-        lastGroup = entry.group;
-        return (
-          <div key={entry.id}>
-            {showGroup && <div className="nav-group">{entry.group}</div>}
-            <button
-              className={`nav-item${page === entry.id ? ' active' : ''}`}
-              onClick={() => setPage(entry.id)}
-            >
-              <span className="nav-icon">{entry.icon}</span>
-              <span>{entry.label}</span>
-              {entry.id === 'instances' && instances.length > 0 && <span className="nav-badge">{instances.length}</span>}
-              {entry.id === 'about' && update?.available && <span className="nav-badge">!</span>}
-            </button>
-          </div>
-        );
-      })}
+      <div className="sidebar-nav">
+        {ENTRIES.map((entry) => {
+          const showGroup = entry.group !== lastGroup;
+          lastGroup = entry.group;
+          return (
+            <div key={entry.id}>
+              {showGroup && <div className="nav-group">{entry.group}</div>}
+              <button
+                className={`nav-item${page === entry.id ? ' active' : ''}`}
+                onClick={() => setPage(entry.id)}
+              >
+                <span className="nav-icon">{entry.icon}</span>
+                <span>{entry.label}</span>
+                {entry.id === 'instances' && instances.length > 0 && <span className="nav-badge">{instances.length}</span>}
+                {entry.id === 'about' && update?.available && <span className="nav-badge">!</span>}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="sidebar-author">
+        Author:{' '}
+        <button
+          className="sidebar-author-link"
+          onClick={() => void call('app:openExternal', { url: 'https://github.com/Gramolis' }).catch(() => undefined)}
+        >
+          Krzychu
+        </button>
+      </div>
     </nav>
   );
 }

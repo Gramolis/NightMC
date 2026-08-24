@@ -193,14 +193,17 @@ export function WizardPage() {
                 <Chip tone="dim">{settings?.defaultMemoryMax ?? 4096} MB max</Chip>
               </div>
             </Field>
-            <label className="switch" style={{ marginBottom: 16 }}>
-              <input type="checkbox" checked={installNow} onChange={(e) => setInstallNow(e.target.checked)} />
-              <span className="track" />
-              <span>Pobierz pliki od razu po utworzeniu</span>
-            </label>
-            <Button variant="primary" onClick={() => void create()} disabled={!canCreate || busy}>
-              {busy ? 'Tworzę…' : 'Utwórz instancję'}
-            </Button>
+            <div className="row wrap" style={{ alignItems: 'center', marginTop: 16 }}>
+              <label className="switch">
+                <input type="checkbox" checked={installNow} onChange={(e) => setInstallNow(e.target.checked)} />
+                <span className="track" />
+                <span>Pobierz pliki od razu po utworzeniu</span>
+              </label>
+              <div className="spacer" />
+              <Button variant="primary" onClick={() => void create()} disabled={!canCreate || busy}>
+                {busy ? 'Tworzę…' : 'Utwórz instancję'}
+              </Button>
+            </div>
           </Card>
         </div>
       </div>

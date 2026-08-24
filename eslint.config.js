@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['out/**', 'dist/**', 'node_modules/**', 'build/**', '*.ico'] },
+  { ignores: ['out/**', 'dist/**', 'node_modules/**', '.pnpm-store/**', 'build/**', '*.ico'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -24,7 +24,7 @@ export default tseslint.config(
   },
   {
     files: ['scripts/**/*.mjs'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    languageOptions: { globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly' } },
     rules: { '@typescript-eslint/no-unused-vars': 'off' },
   },
 );

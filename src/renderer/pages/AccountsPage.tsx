@@ -43,22 +43,13 @@ export function AccountsPage() {
       <div className="grid cols-2" style={{ alignItems: 'start' }}>
         <Card title="Dodaj profil">
           <div className="grid" style={{ gap: 12 }}>
-            <Button variant="primary" onClick={() => void login()} disabled={busy || !authConfigured}>
-              Zaloguj przez Microsoft
-            </Button>
+            {authConfigured && (
+              <Button variant="primary" onClick={() => void login()} disabled={busy}>
+                Zaloguj przez Microsoft
+              </Button>
+            )}
             <Button onClick={() => setAddingOffline(true)}>Dodaj profil Offline / Non-Premium</Button>
           </div>
-
-          {!authConfigured && (
-            <div style={{ marginTop: 16 }}>
-              <Banner>
-                Logowanie Microsoft wymaga własnego Client ID z Microsoft Entra. Uzupełnij
-                <code> NIGHTMC_MS_CLIENT_ID</code> w pliku <code>.env</code> i zbuduj launcher ponownie
-                (dokładna instrukcja jest w README i w <code>.env.example</code>).
-                Profile Offline / Non-Premium działają bez żadnej konfiguracji.
-              </Banner>
-            </div>
-          )}
         </Card>
 
         <Card title="Czym różnią się profile">

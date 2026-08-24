@@ -64,7 +64,6 @@ const DEV_SERVER = process.env.VITE_DEV_SERVER_URL;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let gameState: GameState = { status: 'idle' };
-let activeQueueCancel: (() => void) | null = null;
 
 /* ------------------------------------------------------------------ */
 /* Pojedyncza instancja aplikacji                                      */
@@ -588,7 +587,6 @@ function registerHandlers(): void {
   /* --- gra --- */
   on('game:state', () => ({ state: gameState, running: runningGames() }));
   on('game:cancelDownload', () => {
-    activeQueueCancel?.();
     return true;
   });
   on('game:stop', ({ instanceId }) => stopGame(instanceId));

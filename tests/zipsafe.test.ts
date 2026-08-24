@@ -31,6 +31,43 @@ function makeZip(entries: { name: string; data?: string; attr?: number }[]): str
   return file;
 }
 
+/** AdmZip normalizuje nazwy przy tworzeniu archiwum, więc złośliwą nazwę
+ * wstawiamy bezpośrednio do lokalnego i centralnego nagłówka ZIP. */
+function makeRawNamedZip(safeName: string, rawName: string, data = 'x'): string {
+  if (Buffer.byteLength(safeName) !== Buffer.byteLength(rawName)) throw new Error('Nazwy muszą mieć tę samą długość');
+  const zip = new AdmZip();
+  zip.addFile(safeName, Buffer.from(data));
+  const buffer = zip.toBuffer();
+  const safe = Buffer.from(safeName);
+  const raw = Buffer.from(rawName);
+  let offset = 0;
+  let replacements = 0;
+  while ((offset = buffer.indexOf(safe, offset)) !== -1) {
+    raw.copy(buffer, offset);
+    offset += raw.length;
+    replacements++;
+  }
+  if (replacements !== 2) throw new Error(`Nieoczekiwana liczba nazw wpisu w ZIP: ${replacements}`);
+  const file = path.join(tmp, `test-raw-${Math.random().toString(36).slice(2)}.zip`);
+  fs.writeFileSync(file, buffer);
+  return file;
+}
+
+/** Ustawia uniksowy typ wpisu S_IFLNK w zewnętrznych atrybutach
+ * centralnego nagłówka ZIP. */
+function makeSymlinkZip(name: string, target: string): string {
+  const zip = new AdmZip();
+  zip.addFile(name, Buffer.from(target));
+  const buffer = zip.toBuffer();
+  const central = buffer.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+  if (central < 0) throw new Error('Brak centralnego nagłówka ZIP');
+  buffer[central + 5] = 3; // system tworzący: Unix
+  buffer.writeUInt32LE((0xa1ff << 16) >>> 0, central + 38);
+  const file = path.join(tmp, `test-link-${Math.random().toString(36).slice(2)}.zip`);
+  fs.writeFileSync(file, buffer);
+  return file;
+}
+
 describe('normalizacja nazw wpisów', () => {
   it('przepuszcza zwykłe ścieżki', () => {
     expect(sanitizeEntryName('mods/fabric-api-0.100.jar')).toBe('mods/fabric-api-0.100.jar');
@@ -79,7 +116,7 @@ describe('bezpieczne rozpakowywanie', () => {
   });
 
   it('odmawia rozpakowania archiwum z Zip Slip i nie tworzy pliku poza katalogiem', async () => {
-    const zip = makeZip([{ name: '../../wykradzione.txt', data: 'x' }]);
+    const zip = makeRawNamedZip('00/aa/wykradzione.txt', '../../wykradzione.txt');
     const out = path.join(tmp, 'out2');
     await expect(extractArchive(zip, out)).rejects.toThrow(UnsafeArchiveError);
     expect(fs.existsSync(path.join(tmp, 'wykradzione.txt'))).toBe(false);
@@ -87,8 +124,7 @@ describe('bezpieczne rozpakowywanie', () => {
   });
 
   it('odrzuca dowiązania symboliczne w archiwum', async () => {
-    // 0xA1FF << 16 = tryb S_IFLNK z uprawnieniami.
-    const zip = makeZip([{ name: 'link', data: '/etc/passwd', attr: 0xa1ff << 16 }]);
+    const zip = makeSymlinkZip('link', '/etc/passwd');
     await expect(extractArchive(zip, path.join(tmp, 'out3'))).rejects.toThrow(/dowiązanie symboliczne/);
   });
 

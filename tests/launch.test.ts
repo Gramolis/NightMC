@@ -44,9 +44,10 @@ describe('budowa procesu gry', () => {
   it('przekazuje argumenty jako osobne elementy tablicy, nie jako jeden łańcuch', () => {
     const plan = buildLaunchPlan({ instance, version: MODERN_VERSION, session: offline, javaPath: 'java', roots });
     expect(Array.isArray(plan.args)).toBe(true);
-    // Żaden argument nie może zawierać znaków sterujących powłoki.
+    // Średnik jest prawidłowym separatorem classpath na Windows. Pozostałe
+    // metaznaki powłoki nie powinny trafiać do generowanych argumentów.
     for (const arg of plan.args) {
-      expect(arg).not.toMatch(/[&|;`\n]/);
+      expect(arg).not.toMatch(/[&|`\n]/);
     }
     const nameIndex = plan.args.indexOf('--username');
     expect(plan.args[nameIndex + 1]).toBe('Nocny_Gracz');

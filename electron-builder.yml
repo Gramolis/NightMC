@@ -13,16 +13,14 @@ files:
   - '!**/*.map'
   - '!node_modules/**/{test,__tests__,tests,example,examples,doc,docs}/**'
   - '!node_modules/**/*.{md,markdown,ts,tsx,flow,d.ts.map}'
+  # Moduły natywne są opcjonalne; build korzysta z node:sqlite i safeStorage.
+  - '!**/node_modules/better-sqlite3/**'
+  - '!**/node_modules/keytar/**'
+  - '!**/node_modules/bindings/**'
+  - '!**/node_modules/prebuild-install/**'
 
-# Moduły natywne muszą pozostać rozpakowane, aby dało się je załadować z ASAR.
 asar: true
-asarUnpack:
-  - '**/node_modules/better-sqlite3/**'
-  - '**/node_modules/keytar/**'
-  - '**/node_modules/bindings/**'
-  - '**/node_modules/prebuild-install/**'
-
-npmRebuild: true
+npmRebuild: false
 buildDependenciesFromSource: false
 
 win:

@@ -439,10 +439,9 @@ async function completeChain(ms: MsTokenResponse, existingId?: string): Promise<
 export async function loginMicrosoft(): Promise<LoginResult> {
   if (!isAuthConfigured()) {
     throw new AuthError(
-      'Brak własnego Client ID Microsoft Entra.',
+      'Logowanie Microsoft jest niedostępne w tej wersji launchera.',
       'NO_CLIENT_ID',
-      'Uzupełnij NIGHTMC_MS_CLIENT_ID w pliku .env i zbuduj launcher ponownie (instrukcja w README). ' +
-        'Profile Offline / Non-Premium działają bez tej konfiguracji.',
+      'Możesz korzystać z profili Offline / Non-Premium.',
     );
   }
 
