@@ -1,0 +1,61 @@
+appId: pl.nightmc.launcher
+productName: NightMC
+artifactName: NightMC.${ext}
+copyright: Copyright (c) 2026 NightMC
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+  - '!node_modules/**/{test,__tests__,tests,example,examples,doc,docs}/**'
+  - '!node_modules/**/*.{md,markdown,ts,tsx,flow,d.ts.map}'
+
+# Moduły natywne muszą pozostać rozpakowane, aby dało się je załadować z ASAR.
+asar: true
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+  - '**/node_modules/keytar/**'
+  - '**/node_modules/bindings/**'
+  - '**/node_modules/prebuild-install/**'
+
+npmRebuild: true
+buildDependenciesFromSource: false
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  requestedExecutionLevel: asInvoker
+  # Code signing: ustawiane wyłącznie z sekretów CI (patrz README, sekcja "Podpisywanie EXE").
+  # signtoolOptions:
+  #   certificateFile: ${env.WIN_CSC_LINK}
+  #   certificatePassword: ${env.WIN_CSC_KEY_PASSWORD}
+
+portable:
+  artifactName: NightMC.${ext}
+  # Portable EXE rozpakowuje się do katalogu tymczasowego; dane użytkownika i tak
+  # trzymamy w %APPDATA%\NightMC, więc przenoszenie pliku niczego nie psuje.
+  unpackDirName: NightMC
+  splashImage: null
+
+nsis:
+  artifactName: NightMC-Setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: NightMC
+
+publish:
+  - provider: github
+    releaseType: release

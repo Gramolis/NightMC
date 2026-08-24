@@ -1,0 +1,16 @@
+node_modules/
+out/
+dist/
+coverage/
+.env
+.env.local
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.pfx
+*.p12
+*.snk
+update-key-private.txt
+.vite/
+.eslintcache
