@@ -108,7 +108,14 @@ export function Switch({
 export function ProgressBar({ progress, indeterminate }: { progress: number; indeterminate?: boolean }) {
   const pct = Math.max(0, Math.min(1, progress)) * 100;
   return (
-    <div className={`progress${indeterminate ? ' indeterminate' : ''}`}>
+    <div
+      className={`progress${indeterminate ? ' indeterminate' : ''}`}
+      role="progressbar"
+      aria-label="Postęp pobierania"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={indeterminate ? undefined : Math.round(pct)}
+    >
       <div className="progress-fill" style={{ width: `${indeterminate ? 34 : pct}%` }} />
     </div>
   );
@@ -116,11 +123,13 @@ export function ProgressBar({ progress, indeterminate }: { progress: number; ind
 
 export function DownloadPanel({ progress }: { progress: DownloadProgress }) {
   const known = progress.bytesTotal > 0 || progress.filesTotal > 0;
+  const percent = Math.round(Math.max(0, Math.min(1, progress.progress)) * 100);
   return (
     <div className="fade-in">
       <div className="row" style={{ marginBottom: 8 }}>
         <strong style={{ fontSize: 13 }}>{progress.phase}</strong>
         <div className="spacer" />
+        <span className="progress-percent">{known ? `${percent}%` : '…'}</span>
         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
           {progress.filesTotal > 0 ? `${progress.filesDone} / ${progress.filesTotal}` : ''}
         </span>

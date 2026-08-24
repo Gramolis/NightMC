@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { call, formatBytes, formatNumber } from '../api.js';
 import { useStore } from '../store/useStore.js';
-import { Banner, Button, Card, Chip, Field, Modal } from '../components/UI.js';
+import { Banner, Button, Card, Chip, DownloadPanel, Field, Modal, ProgressBar } from '../components/UI.js';
 import { IconDownload, IconPackage, IconSearch } from '../components/Icons.js';
 import type { Instance, PackBuilderItem, PackCatalogProject, PackCatalogVersion, PackPreview } from '../../shared/types.js';
 
 export function PacksPage() {
-  const { pushToast, refreshInstances, selectInstance, setPage, instances, settings } = useStore();
+  const { pushToast, refreshInstances, selectInstance, setPage, instances, settings, progress } = useStore();
   const [token, setToken] = useState('');
   const [preview, setPreview] = useState<PackPreview | null>(null);
   const [name, setName] = useState('');
@@ -35,6 +35,7 @@ export function PacksPage() {
   const [pickingPack, setPickingPack] = useState<PackCatalogProject | null>(null);
   const [packVersions, setPackVersions] = useState<PackCatalogVersion[]>([]);
   const [installingPack, setInstallingPack] = useState(false);
+  const [downloadingVersionId, setDownloadingVersionId] = useState<string | null>(null);
   const [downloadedPack, setDownloadedPack] = useState<Instance | null>(null);
 
   const searchPacks = async () => {
@@ -75,6 +76,8 @@ export function PacksPage() {
 
   const downloadPack = async (version: PackCatalogVersion) => {
     if (!pickingPack) return;
+    useStore.setState({ progress: null });
+    setDownloadingVersionId(version.versionId);
     setInstallingPack(true);
     try {
       const instance = await call<Instance>('packBuilder:installPack', {
@@ -92,6 +95,8 @@ export function PacksPage() {
       pushToast('error', (e as Error).message);
     } finally {
       setInstallingPack(false);
+      setDownloadingVersionId(null);
+      useStore.setState({ progress: null });
     }
   };
 
@@ -487,6 +492,20 @@ export function PacksPage() {
 
       {pickingPack && (
         <Modal title={`Wersje paczki: ${pickingPack.title}`} onClose={() => !installingPack && setPickingPack(null)} wide>
+          {installingPack && (
+            <div className="pack-download-progress">
+              <div className="pack-download-heading">
+                <div>
+                  <div className="list-title">Pobieranie wybranej wersji</div>
+                  <div className="list-sub">
+                    {packVersions.find((version) => version.versionId === downloadingVersionId)?.name ?? pickingPack.title}
+                  </div>
+                </div>
+                {!progress && <span className="progress-percent">Przygotowanie…</span>}
+              </div>
+              {progress ? <DownloadPanel progress={progress} /> : <ProgressBar progress={0} indeterminate />}
+            </div>
+          )}
           {packVersions.length === 0 ? (
             <Banner kind="info">Brak wersji paczki możliwych do pobrania.</Banner>
           ) : (
@@ -503,7 +522,7 @@ export function PacksPage() {
                   </div>
                   <Chip tone={version.releaseType === 'release' ? 'ok' : 'warn'}>{version.releaseType}</Chip>
                   <Button small variant="primary" disabled={installingPack} onClick={() => void downloadPack(version)}>
-                    <IconDownload size={14} /> {installingPack ? 'Pobieram…' : 'Pobierz paczkę'}
+                    <IconDownload size={14} /> {downloadingVersionId === version.versionId ? 'Pobieram…' : 'Pobierz paczkę'}
                   </Button>
                 </div>
               ))}

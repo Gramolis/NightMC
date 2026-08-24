@@ -145,8 +145,18 @@ export class DownloadQueue {
     this.lastEmit = now;
     const speed = this.meter.speed;
     const remaining = Math.max(0, this.bytesTotal - this.bytesDone);
+    const filesProgress = this.tasks.length === 0 ? 1 : this.filesDone / this.tasks.length;
+    const allSizesKnown = this.tasks.length > 0 && this.tasks.every((task) => (task.size ?? 0) > 0);
+    const finished = this.tasks.length === 0 || this.filesDone >= this.tasks.length;
+    // Dla dużego pojedynczego pliku licznik plików pozostaje na 0/1 aż do końca.
+    // Gdy znamy rozmiary, pokazujemy więc rzeczywisty postęp odebranych bajtów.
+    const progress = finished
+      ? 1
+      : allSizesKnown
+        ? Math.min(0.999, Math.max(0, this.bytesDone / this.bytesTotal))
+        : filesProgress;
     this.opts.onProgress?.({
-      progress: this.tasks.length === 0 ? 1 : this.filesDone / this.tasks.length,
+      progress,
       filesDone: this.filesDone,
       filesTotal: this.tasks.length,
       bytesDone: this.bytesDone,

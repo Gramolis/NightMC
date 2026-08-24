@@ -183,15 +183,16 @@ describe('kolejka pobierania', () => {
   });
 
   it('raportuje postęp z prędkością i licznikiem plików', async () => {
-    const events: number[] = [];
+    const events: { filesDone: number; progress: number }[] = [];
     const q = new DownloadQueue({
       allowExtraHosts: extra,
-      onProgress: (p) => events.push(p.filesDone),
+      onProgress: (p) => events.push({ filesDone: p.filesDone, progress: p.progress }),
     });
     q.add({ id: '1', url: `${base}/ok`, dest: path.join(tmp, 'p.bin'), sha1: SHA1, size: PAYLOAD.length });
     await q.run();
     expect(events.length).toBeGreaterThan(0);
-    expect(events[events.length - 1]).toBe(1);
+    expect(events[events.length - 1]).toEqual({ filesDone: 1, progress: 1 });
+    expect(events.every((event) => event.progress >= 0 && event.progress <= 1)).toBe(true);
   });
 
   it('blokuje adresy spoza dozwolonej listy hostów', async () => {
