@@ -31,6 +31,7 @@ Vanilla · Fabric · Forge · NeoForge · Modrinth · `.mrpack` · CurseForge ZI
 15. [Znane ograniczenia](#znane-ograniczenia)
 16. [Publikowanie wersji](#publikowanie-wersji)
 17. [Zgodność prawna i licencje](#zgodność-prawna-i-licencje)
+18. [Changelog](#changelog)
 
 ---
 
@@ -50,6 +51,8 @@ Obsługuje:
 - aktualizacje przez **GitHub Releases** i aktualności ze statycznego JSON-a.
 
 Czego **nie** robi i robić nie będzie: nie omija logowania Microsoft, nie tworzy fałszywych kont ani sesji premium, nie pozwala profilowi offline wejść na serwer z `online-mode=true`, nie przechowuje haseł Microsoft, nie zawiera plików gry ani cudzych kluczy API.
+
+Pełna historia zmian znajduje się w pliku [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

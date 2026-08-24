@@ -70,7 +70,7 @@ export function isUpdatesConfigured(): boolean {
 }
 
 /** Sprawdza najnowsze wydanie. Brak konfiguracji lub błąd sieci nie blokuje launchera. */
-export async function checkForUpdate(currentVersion = app?.getVersion?.() ?? '1.0.0'): Promise<UpdateInfo> {
+export async function checkForUpdate(currentVersion = app?.getVersion?.() ?? '1.0.1'): Promise<UpdateInfo> {
   if (!isUpdatesConfigured()) {
     return { available: false, currentVersion };
   }

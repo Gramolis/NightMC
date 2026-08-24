@@ -1,6 +1,13 @@
 {
   "items": [
     {
+      "id": "news-1-0-1",
+      "title": "NightMC 1.0.1",
+      "description": "Nowy katalog paczek Modrinth i CurseForge, edycja modów, naprawa paczek i Forge oraz automatyczny suwak RAM.",
+      "url": "https://github.com/Gramolis/NightMC/releases/tag/v1.0.1",
+      "publishedAt": "2026-08-24T19:45:00Z"
+    },
+    {
       "id": "news-1",
       "title": "NightMC 1.0",
       "description": "Pierwsze wydanie launchera: Vanilla, Fabric, Forge, NeoForge, Modrinth, import paczek i pełne profile Offline / Non-Premium.",
