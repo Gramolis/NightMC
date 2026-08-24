@@ -338,12 +338,12 @@ nightmc/
 
 ```bash
 # 1. Podbij wersję w package.json
-npm version 1.0.3 --no-git-tag-version
+npm version 1.0.4 --no-git-tag-version
 
 # 2. Zatwierdź i otaguj
 git add -A
-git commit -m "NightMC 1.0.3"
-git tag v1.0.3
+git commit -m "NightMC 1.0.4"
+git tag v1.0.4
 git push origin main --tags
 ```
 

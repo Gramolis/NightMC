@@ -34,7 +34,7 @@ import type {
 } from '../shared/types.js';
 
 /** Wersja launchera wstawiana w argumenty gry. Ustawiana z procesu głównego. */
-let launcherVersion = '1.0.3';
+let launcherVersion = '1.0.4';
 
 export function setLauncherVersion(version: string): void {
   launcherVersion = version;

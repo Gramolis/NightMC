@@ -65,7 +65,7 @@ export interface FetchOptions {
   allowExtraHosts?: string[];
 }
 
-const USER_AGENT = 'NightMC/1.0.3 (+https://github.com/Gramolis/NightMC)';
+const USER_AGENT = 'NightMC/1.0.4 (+https://github.com/Gramolis/NightMC)';
 
 function combineSignals(a: AbortSignal | undefined, b: AbortSignal): AbortSignal {
   if (!a) return b;

@@ -5,6 +5,8 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ## [Unreleased]
 
+## [1.0.4] — 2026-08-25
+
 ### Dodano
 
 - Animowane intro uruchamiane natychmiast z NightMC, napisem „Made by Krzychu” i płynnym odsłonięciem gotowego menu.
@@ -85,7 +87,8 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 - Aktualizacje i aktualności z repozytorium GitHub.
 - Logi, diagnostykę uruchomienia, kopie zapasowe i eksport instancji.
 
-[Unreleased]: https://github.com/Gramolis/NightMC/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/Gramolis/NightMC/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/Gramolis/NightMC/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/Gramolis/NightMC/compare/v1.0.1...v1.0.3
 [1.0.1]: https://github.com/Gramolis/NightMC/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Gramolis/NightMC/releases/tag/v1.0.0
