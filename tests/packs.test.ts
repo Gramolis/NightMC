@@ -83,7 +83,15 @@ describe('rozpoznawanie formatu paczki', () => {
   });
 
   it('odrzuca archiwum, które nie jest paczką', () => {
-    expect(() => detectPackKind(writeZip({ 'cokolwiek.txt': 'x' }))).toThrow(PackError);
+    expect(() => detectPackKind(writeZip({ 'cokolwiek.txt': 'x' }))).toThrow(/wgrana ręcznie/);
+  });
+
+  it('wyjaśnia ręczny import ZIP-a z modami, ale bez manifestu', () => {
+    expect(() => detectPackKind(writeZip({ 'mods/example.jar': 'x' }))).toThrow(/wgrana ręcznie/);
+  });
+
+  it('wymaga manifestu w głównym katalogu ZIP-a', () => {
+    expect(() => detectPackKind(writeZip({ 'Paczka/manifest.json': '{}' }))).toThrow(/głównym katalogu/);
   });
 });
 
@@ -150,6 +158,11 @@ describe('CurseForge', () => {
   it('waliduje manifest', () => {
     expect(parseCurseForgeManifest(CF_MANIFEST).name).toBe('Paczka CF');
     expect(() => parseCurseForgeManifest({ manifestType: 'x' })).toThrow(PackError);
+    expect(() => parseCurseForgeManifest({
+      manifestType: 'minecraftModpack',
+      minecraft: { version: '1.20.1', modLoaders: [] },
+      files: [],
+    })).toThrow(/Forge, Fabric ani NeoForge/);
   });
 
   it('mapuje identyfikator loadera', () => {
@@ -171,6 +184,25 @@ describe('CurseForge', () => {
     expect(preview.requiredFiles).toHaveLength(2);
     expect(preview.overrideCount).toBe(1);
     expect(preview.warnings.join(' ')).toContain('klucza API');
+  });
+
+  it('odrzuca pustą paczkę bez referencji i dołączonych modów', () => {
+    const file = writeZip({
+      'manifest.json': JSON.stringify({ ...CF_MANIFEST, files: [] }),
+      'overrides/config/x.cfg': 'x',
+    });
+    expect(() => previewCurseForge(file)).toThrow(/wgrana ręcznie/);
+  });
+
+  it('akceptuje paczkę z modami dołączonymi w overrides', () => {
+    const file = writeZip({
+      'manifest.json': JSON.stringify({ ...CF_MANIFEST, files: [] }),
+      'overrides/mods/example.jar': 'x',
+      'overrides/config/x.cfg': 'x',
+    });
+    const preview = previewCurseForge(file);
+    expect(preview.requiredFiles).toHaveLength(0);
+    expect(preview.warnings.join(' ')).toContain('1 dołączonych modów');
   });
 });
 

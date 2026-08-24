@@ -9,6 +9,12 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 - Wbudowany ekran changeloga w NightMC, automatycznie synchronizowany z `CHANGELOG.md` na GitHubie.
 - Ręczne odświeżanie changeloga oraz zapisaną kopię używaną przy braku internetu.
+- Automatyczne tworzenie kompletnej instancji z lokalnego ZIP-a CurseForge na podstawie wersji gry i loadera z manifestu.
+
+### Zmieniono
+
+- Import ZIP nie tworzy już pustej instancji, gdy brakuje klucza CurseForge lub ręcznie wskazanych modów.
+- Archiwa bez manifestu, loadera albo zawartości modów pokazują trwałą instrukcję ręcznego utworzenia instancji i skopiowania folderów `mods` oraz `config`.
 
 ## [1.0.1] — 2026-08-24
 

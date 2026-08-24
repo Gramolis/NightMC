@@ -16,7 +16,7 @@ import AdmZip from 'adm-zip';
 import { ENDPOINTS } from '../shared/constants.js';
 import { DownloadQueue, hashFile, verifyFile } from './downloader.js';
 import { extractArchive, inspectArchive, readArchiveEntry, UnsafeArchiveError } from './zipsafe.js';
-import { createInstance, getInstance, refreshModCount } from './instances.js';
+import { createInstance, deleteInstance, getInstance, refreshModCount } from './instances.js';
 import { getSecret, SECRET_KEYS } from './secrets.js';
 import { fetchJson, isAllowedUrl } from './net.js';
 import { log } from './logging.js';
@@ -42,6 +42,15 @@ export class PackError extends Error {
     super(message);
     this.name = 'PackError';
   }
+}
+
+const MANUAL_PACK_HINT =
+  'Utwórz instancję z wersją Minecrafta i loaderem '
+  + '(Forge, Fabric albo NeoForge) podanym przez autora paczki, otwórz katalog instancji i skopiuj '
+  + 'z archiwum odpowiednie foldery do katalogu minecraft — przede wszystkim mods i config.';
+
+function manualPackError(reason: string): PackError {
+  return new PackError(`${reason} Ta paczka musi zostać wgrana ręcznie.`, MANUAL_PACK_HINT);
 }
 
 interface PackLockDownloadFile {
@@ -139,12 +148,25 @@ function storePreview(file: string, preview: PackPreview): string {
 
 /** Rozpoznaje typ archiwum po zawartości, nie po rozszerzeniu. */
 export function detectPackKind(zipFile: string): 'mrpack' | 'curseforge' {
-  const zip = new AdmZip(zipFile);
+  let zip: AdmZip;
+  try {
+    zip = new AdmZip(zipFile);
+  } catch {
+    throw manualPackError('Nie udało się otworzyć archiwum ZIP albo plik jest uszkodzony.');
+  }
   if (zip.getEntry('modrinth.index.json')) return 'mrpack';
   if (zip.getEntry('manifest.json')) return 'curseforge';
-  throw new PackError(
-    'To archiwum nie jest paczką Modrinth ani CurseForge.',
-    'Oczekiwano pliku modrinth.index.json (.mrpack) albo manifest.json (CurseForge).',
+  const entries = zip.getEntries().filter((entry) => !entry.isDirectory);
+  const nestedManifest = entries.some((entry) => /(^|\/)manifest\.json$/i.test(entry.entryName));
+  const containsMods = entries.some((entry) => /(^|\/)mods\/[^/]+\.jar$/i.test(entry.entryName));
+  if (nestedManifest) {
+    throw manualPackError('Plik manifest.json nie znajduje się w głównym katalogu archiwum.');
+  }
+  if (containsMods) {
+    throw manualPackError('ZIP zawiera pliki modów, ale nie zawiera manifestu określającego wersję gry i loader.');
+  }
+  throw manualPackError(
+    'ZIP nie zawiera manifestu CurseForge, indeksu Modrinth ani plików modów potrzebnych do analizy.',
   );
 }
 
@@ -354,8 +376,18 @@ export async function exportMrpack(instanceId: string, destFile: string): Promis
 
 export function parseCurseForgeManifest(raw: unknown): CurseForgeManifest {
   const m = raw as CurseForgeManifest;
-  if (!m || typeof m !== 'object') throw new PackError('manifest.json jest uszkodzony.');
-  if (!m.minecraft?.version) throw new PackError('manifest.json nie zawiera wersji Minecrafta.');
+  if (!m || typeof m !== 'object') throw manualPackError('manifest.json jest uszkodzony.');
+  if (m.manifestType !== 'minecraftModpack') {
+    throw manualPackError('manifest.json nie opisuje paczki Minecraft CurseForge.');
+  }
+  if (!m.minecraft?.version) throw manualPackError('manifest.json nie zawiera wersji Minecrafta.');
+  if (!Array.isArray(m.minecraft.modLoaders) || m.minecraft.modLoaders.length === 0) {
+    throw manualPackError('manifest.json nie zawiera informacji o Forge, Fabric ani NeoForge.');
+  }
+  if (!m.minecraft.modLoaders.some((loader) => typeof loader?.id === 'string' && loader.id.trim())) {
+    throw manualPackError('manifest.json zawiera nieprawidłową informację o loaderze paczki.');
+  }
+  if (typeof m.name !== 'string' || !m.name.trim()) m.name = 'Zaimportowana paczka CurseForge';
   if (!Array.isArray(m.files)) m.files = [];
   return m;
 }
@@ -376,17 +408,35 @@ export function previewCurseForge(zipFile: string): PackPreview {
   const { totalBytes } = inspectArchive(zipFile);
   const raw = readArchiveEntry(zipFile, 'manifest.json', 8 * 1024 * 1024);
   if (!raw) throw new PackError('Archiwum nie zawiera manifest.json.');
-  const manifest = parseCurseForgeManifest(JSON.parse(raw.toString('utf8')));
+  let manifest: CurseForgeManifest;
+  try {
+    manifest = parseCurseForgeManifest(JSON.parse(raw.toString('utf8')));
+  } catch (e) {
+    if (e instanceof PackError) throw e;
+    throw manualPackError('Nie udało się odczytać manifest.json z paczki.');
+  }
 
   const primaryLoader = manifest.minecraft.modLoaders.find((l) => l.primary) ?? manifest.minecraft.modLoaders[0];
   const target = primaryLoader
     ? loaderFromCurseForgeId(primaryLoader.id, manifest.minecraft.version)
     : { loader: 'vanilla' as LoaderId };
+  if (target.loader === 'vanilla' || !target.loaderVersion) {
+    throw manualPackError(`NightMC nie rozpoznaje loadera paczki: ${primaryLoader?.id ?? 'brak'}.`);
+  }
 
   const overridesDir = manifest.overrides ?? 'overrides';
   const overrideCount = new AdmZip(zipFile)
     .getEntries()
     .filter((e) => !e.isDirectory && e.entryName.startsWith(`${overridesDir}/`)).length;
+  const bundledModCount = new AdmZip(zipFile)
+    .getEntries()
+    .filter((entry) => !entry.isDirectory && (
+      entry.entryName.toLowerCase().startsWith(`${overridesDir.toLowerCase()}/mods/`)
+      || /^mods\/[^/]+\.jar$/i.test(entry.entryName)
+    ) && /\.jar$/i.test(entry.entryName)).length;
+  if (manifest.files.length === 0 && bundledModCount === 0) {
+    throw manualPackError('Paczka nie zawiera listy wymaganych modów ani dołączonych plików JAR.');
+  }
 
   return {
     kind: 'curseforge',
@@ -404,9 +454,11 @@ export function previewCurseForge(zipFile: string): PackPreview {
     overrideCount,
     estimatedBytes: totalBytes,
     warnings: [
-      'NightMC nie zawiera klucza API CurseForge, więc nie pobiera modów automatycznie.',
-      'Nadpisania (configi, skrypty, resource packi) zostaną rozpakowane normalnie.',
-      'Brakujące mody możesz wskazać ręcznie albo wpisać własny klucz API w Ustawieniach.',
+      `Wykryto Minecraft ${manifest.minecraft.version} i ${target.loader} ${target.loaderVersion}.`,
+      bundledModCount > 0
+        ? `Archiwum zawiera ${bundledModCount} dołączonych modów; zostaną rozpakowane automatycznie.`
+        : 'Mody są zapisane jako referencje CurseForge i zostaną pobrane przy użyciu Twojego klucza API.',
+      'Nadpisania (configi, skrypty i resource packi) zostaną rozpakowane automatycznie.',
     ],
   };
 }
@@ -444,6 +496,14 @@ async function importCurseForge(
     ? loaderFromCurseForgeId(primaryLoader.id, manifest.minecraft.version)
     : { loader: 'vanilla' as LoaderId, loaderVersion: undefined };
 
+  const apiKey = await getSecret(SECRET_KEYS.curseforgeApiKey());
+  if (manifest.files.length > 0 && !apiKey && manual.size < manifest.files.length) {
+    throw new PackError(
+      `Brakuje ${manifest.files.length - manual.size} modów wymaganych przez paczkę CurseForge.`,
+      'Dodaj własny klucz API CurseForge w Ustawieniach albo wskaż wszystkie wymagane pliki JAR ręcznie. Instancja nie została utworzona.',
+    );
+  }
+
   const instance = createInstance(
     {
       name: instanceName,
@@ -469,14 +529,15 @@ async function importCurseForge(
   }
 
   // 2. Jeżeli użytkownik podał własny klucz API - dociągamy resztę.
-  const apiKey = await getSecret(SECRET_KEYS.curseforgeApiKey());
   const resolvedFiles: { projectID: number; fileID: number; info: NonNullable<Awaited<ReturnType<typeof curseForgeFileInfo>>> }[] = [];
+  let unavailableFiles = 0;
   if (apiKey && manifest.files.length > 0) {
     const queue = new DownloadQueue({ onProgress, phase: 'Pobieranie modów z CurseForge' });
     for (const f of manifest.files) {
       const info = await curseForgeFileInfo(f.projectID, f.fileID, apiKey);
       if (!info?.downloadUrl) {
         log.warn(`CurseForge: plik ${f.projectID}/${f.fileID} ma wyłączone pobieranie przez API - wskaż go ręcznie`);
+        unavailableFiles++;
         continue;
       }
       resolvedFiles.push({ projectID: f.projectID, fileID: f.fileID, info });
@@ -490,7 +551,23 @@ async function importCurseForge(
         label: info.displayName,
       });
     }
-    if (queue.size > 0) await queue.run();
+    if (queue.size > 0) {
+      const result = await queue.run();
+      if (!result.ok || result.cancelled) {
+        await deleteInstance(instance.id);
+        throw new PackError(
+          result.cancelled ? 'Import paczki został anulowany.' : `Nie udało się pobrać ${result.failed.length} modów paczki.`,
+          'Niekompletna instancja została usunięta. Sprawdź połączenie i spróbuj ponownie.',
+        );
+      }
+    }
+  }
+  if (unavailableFiles > manual.size) {
+    await deleteInstance(instance.id);
+    throw new PackError(
+      `${unavailableFiles} modów ma wyłączone pobieranie przez aplikacje zewnętrzne.`,
+      'Niekompletna instancja została usunięta. Pobierz te mody ręcznie, wskaż ich pliki JAR w podglądzie paczki i spróbuj ponownie.',
+    );
   }
 
   const saveMod = db().prepare(

@@ -14,6 +14,7 @@ export function PacksPage() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState<Record<string, string>>({});
+  const [packError, setPackError] = useState('');
 
   const moddedInstances = instances.filter((i) => i.loader !== 'vanilla');
   const [builderInstanceId, setBuilderInstanceId] = useState(moddedInstances[0]?.id ?? '');
@@ -171,6 +172,7 @@ export function PacksPage() {
 
   const pick = async () => {
     try {
+      setPackError('');
       const res = await call<{ token: string; preview: PackPreview } | null>('packs:pickAndPreview');
       if (!res) return;
       setToken(res.token);
@@ -178,7 +180,9 @@ export function PacksPage() {
       setName(res.preview.name);
       setManual({});
     } catch (e) {
-      pushToast('error', (e as Error).message);
+      const message = (e as Error).message;
+      setPackError(message);
+      pushToast('error', message);
     }
   };
 
@@ -199,12 +203,20 @@ export function PacksPage() {
     }
   };
 
+  const missingManualFiles = preview?.kind === 'curseforge'
+    ? preview.requiredFiles.filter((file) => !manual[file.name]).length
+    : 0;
+  const curseForgeReady = preview?.kind !== 'curseforge'
+    || Boolean(settings?.curseforgeKeySet)
+    || missingManualFiles === 0;
+
   return (
     <div className="fade-in">
       <div className="page-head">
         <h1 className="page-title">Paczki modów</h1>
         <p className="page-sub">
           Obsługiwane są paczki Modrinth (.mrpack) oraz lokalnie pobrane archiwa CurseForge (.zip).
+          NightMC odczyta z manifestu właściwą wersję Minecrafta i Forge, Fabric albo NeoForge oraz utworzy gotową instancję.
           Każde archiwum jest sprawdzane pod kątem Zip Slip, dowiązań symbolicznych i bomb ZIP,
           a przewidywany rozmiar liczony jest przed rozpakowaniem.
         </p>
@@ -365,6 +377,12 @@ export function PacksPage() {
         <Card title="Wybierz plik paczki" subtitle="NightMC rozpozna format po zawartości archiwum, nie po rozszerzeniu.">
           <Button variant="primary" onClick={() => void pick()}><IconPackage size={16} /> Wskaż plik .mrpack lub .zip</Button>
 
+          {packError && (
+            <div style={{ marginTop: 14 }}>
+              <Banner>{packError}</Banner>
+            </div>
+          )}
+
           <div style={{ marginTop: 18 }}>
             <Banner kind="info">
               CurseForge nie pozwala pobierać modów bez klucza API, a NightMC nie zawiera żadnego cudzego klucza.
@@ -438,7 +456,16 @@ export function PacksPage() {
               </Field>
             )}
 
-            <Button variant="primary" onClick={() => void doImport()} disabled={busy || !name.trim()}>
+            {preview.kind === 'curseforge' && !settings?.curseforgeKeySet && missingManualFiles > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <Banner>
+                  Do automatycznego utworzenia kompletnej instancji brakuje {missingManualFiles} modów. Dodaj własny klucz
+                  CurseForge w Ustawieniach albo wskaż każdy plik JAR ręcznie. NightMC nie utworzy pustej, niedziałającej instancji.
+                </Banner>
+              </div>
+            )}
+
+            <Button variant="primary" onClick={() => void doImport()} disabled={busy || !name.trim() || !curseForgeReady}>
               <IconDownload size={16} /> {busy ? 'Importuję…' : 'Importuj jako instancję'}
             </Button>
           </Card>
