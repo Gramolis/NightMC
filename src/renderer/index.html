@@ -48,6 +48,10 @@
       .nm-intro {
         --nm-s: 1;
         --nm-off: 0ms;
+        /* Punkt kontaktu obu napisów. Jest liczony responsywnie, ale ma
+           bezpieczne granice dla małych i bardzo dużych okien. */
+        --nm-impact-y: clamp(-82px, -9.3vh, -43px);
+        --nm-author-rest-y: clamp(-96px, -11vh, -54px);
         position: fixed;
         inset: 0;
         z-index: 9000;
@@ -143,7 +147,11 @@
         font-size: clamp(42px, 8.6vw, 118px);
         font-weight: 700;
         letter-spacing: 0.04em;
-        line-height: 1.05;
+        line-height: 1.16;
+        /* Dodatkowy obszar malowania chroni dolną część liter i neonową
+           poświatę przed przycięciem przez zbyt ciasny line-box. */
+        padding: 0.08em 0.10em 0.18em;
+        margin: -0.08em -0.10em -0.18em;
         white-space: nowrap;
         background: linear-gradient(112deg, #ffffff 0%, #cbb8ff 42%, #7fe6f7 100%);
         -webkit-background-clip: text;
@@ -187,10 +195,10 @@
         /* 57.4% = 1850 ms -> kontakt: "Made by Krzychu" trafia w GÓRNĄ część
            napisu "NightMC". Napisy nie siadają na wspólnej linii bazowej,
            więc uderzenie jest czytelne, a nie zamazane. */
-        57.4% { transform: translate3d(0, -6vh, 0) scale(1.12); opacity: 1; filter: blur(0); }
+        57.4% { transform: translate3d(0, var(--nm-impact-y), 0) scale(1.08); opacity: 1; filter: blur(0); }
         /* odbicie w górę - "NightMC" odlatuje w dół, napis autora się cofa */
-        68% { transform: translate3d(0, -9.5vh, 0) scale(0.99); }
-        100% { transform: translate3d(0, -7.5vh, 0) scale(1); opacity: 1; filter: blur(0); }
+        68% { transform: translate3d(0, calc(var(--nm-impact-y) - 12px), 0) scale(0.99); }
+        100% { transform: translate3d(0, var(--nm-author-rest-y), 0) scale(1); opacity: 1; filter: blur(0); }
       }
 
       /* --- fala energii w momencie kontaktu ------------------------ */
@@ -209,9 +217,9 @@
         animation-delay: calc(1850ms * var(--nm-s) + var(--nm-off));
       }
       @keyframes nm-shock {
-        0% { transform: scale(0.12); opacity: 0; }
+        0% { transform: translate3d(0, var(--nm-impact-y), 0) scale(0.12); opacity: 0; }
         18% { opacity: 0.95; }
-        100% { transform: scale(1.5); opacity: 0; }
+        100% { transform: translate3d(0, var(--nm-impact-y), 0) scale(1.5); opacity: 0; }
       }
 
       /* --- rozbłysk kontaktu + końcowy błysk ----------------------- */
@@ -224,7 +232,7 @@
         will-change: opacity;
       }
       .nm-intro__spark {
-        background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85), rgba(150, 118, 255, 0.28) 26%, transparent 52%);
+        background: radial-gradient(circle at 50% calc(50% + var(--nm-impact-y)), rgba(255, 255, 255, 0.85), rgba(150, 118, 255, 0.28) 26%, transparent 52%);
         animation: nm-spark calc(340ms * var(--nm-s)) ease-out both;
         animation-delay: calc(1800ms * var(--nm-s) + var(--nm-off));
       }

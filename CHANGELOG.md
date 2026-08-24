@@ -21,6 +21,7 @@ W tym pliku zapisujemy najważniejsze zmiany widoczne dla użytkowników. Projek
 
 ### Naprawiono
 
+- Dolna część napisu „NightMC” w intro nie jest już przycinana, a „Made by Krzychu” uderza w jego górną krawędź zamiast nachodzić na litery.
 - Wartości RAM poniżej rekomendacji nie są już błędnie opisywane jako „Powyżej rekomendacji”.
 
 ## [1.0.3] — 2026-08-24
