@@ -183,13 +183,6 @@ export const LIMITS = {
   maxLogLines: 5000,
 } as const;
 
-export const RAM_PRESETS = [
-  { label: '2 GB', min: 512, max: 2048 },
-  { label: '4 GB', min: 1024, max: 4096 },
-  { label: '6 GB', min: 1024, max: 6144 },
-  { label: '8 GB', min: 2048, max: 8192 },
-] as const;
-
 /** Domyślne argumenty JVM - stabilny zestaw G1GC używany przez większość launcherów. */
 export const DEFAULT_JVM_ARGS = [
   '-XX:+UnlockExperimentalVMOptions',

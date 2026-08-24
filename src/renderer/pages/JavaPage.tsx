@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { call } from '../api.js';
 import { useSelectedInstance, useStore } from '../store/useStore.js';
-import { Banner, Button, Card, Chip, DownloadPanel, Field, Stat } from '../components/UI.js';
+import { Banner, Button, Card, Chip, DownloadPanel, Stat } from '../components/UI.js';
 import { IconCpu, IconDownload, IconRefresh, IconTrash } from '../components/Icons.js';
-import { RAM_PRESETS } from '../../shared/constants.js';
+import { memoryLevel, recommendedInstanceMemoryMB } from '../../shared/memory.js';
 import type { JavaInstall } from '../../shared/types.js';
 
 interface MemoryAdvice {
@@ -23,6 +23,7 @@ export function JavaPage() {
   const [memory, setMemory] = useState<MemoryAdvice | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [selectedMemory, setSelectedMemory] = useState(4096);
 
   const detect = async () => {
     setLoading(true);
@@ -42,6 +43,29 @@ export function JavaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const sliderMin = 1024;
+  const sliderMax = Math.max(sliderMin, Math.floor((memory?.hardLimitMB ?? 8192) / 512) * 512);
+  const optimalMemory = recommendedInstanceMemoryMB(
+    memory?.totalMB ?? 8192,
+    instance?.modCount ?? 0,
+    Boolean(instance && instance.loader !== 'vanilla'),
+  );
+  const optimalPosition = sliderMax === sliderMin
+    ? 0
+    : ((optimalMemory - sliderMin) / (sliderMax - sliderMin)) * 100;
+  const level = memoryLevel(selectedMemory, optimalMemory, sliderMax);
+  const levelInfo = {
+    low: { label: 'Może być za mało', tone: 'warn' as const, detail: 'Gra lub większa paczka może ładować się wolniej albo zabraknie jej pamięci.' },
+    optimal: { label: 'Optymalne', tone: 'ok' as const, detail: 'Najlepszy balans dla tej instancji i tego komputera.' },
+    elevated: { label: 'Powyżej rekomendacji', tone: 'cyan' as const, detail: 'Bezpiecznie, ale dodatkowy RAM prawdopodobnie nie przyspieszy gry.' },
+    high: { label: 'Wysokie zużycie', tone: 'err' as const, detail: 'Zostaje mało pamięci dla Windows, launchera i innych programów.' },
+  }[level];
+
+  useEffect(() => {
+    const stored = instance?.memoryMax ?? settings?.defaultMemoryMax ?? optimalMemory;
+    setSelectedMemory(Math.max(sliderMin, Math.min(stored, sliderMax)));
+  }, [instance?.id, instance?.memoryMax, settings?.defaultMemoryMax, optimalMemory, sliderMax]);
+
   const download = async (major: number) => {
     setBusy(true);
     try {
@@ -54,15 +78,23 @@ export function JavaPage() {
     }
   };
 
-  const applyPreset = async (min: number, max: number) => {
-    if (instance) {
-      await call('instances:update', { id: instance.id, patch: { memoryMin: min, memoryMax: max } });
-      await refreshInstances();
-      pushToast('success', `Ustawiono ${max} MB dla instancji „${instance.name}”.`);
-    } else {
-      await call('settings:set', { patch: { defaultMemoryMin: min, defaultMemoryMax: max } });
-      await refreshSettings();
-      pushToast('success', `Domyślna pamięć: ${max} MB.`);
+  const applyMemory = async (max: number) => {
+    const min = Math.min(1024, max);
+    setBusy(true);
+    try {
+      if (instance) {
+        await call('instances:update', { id: instance.id, patch: { memoryMin: min, memoryMax: max } });
+        await refreshInstances();
+        pushToast('success', `Ustawiono ${formatMemory(max)} dla instancji „${instance.name}”.`);
+      } else {
+        await call('settings:set', { patch: { defaultMemoryMin: min, defaultMemoryMax: max } });
+        await refreshSettings();
+        pushToast('success', `Domyślna pamięć: ${formatMemory(max)}.`);
+      }
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -172,20 +204,54 @@ export function JavaPage() {
               </div>
             )}
 
-            <Field label="Profile pamięci">
-              <div className="row wrap" style={{ gap: 8 }}>
-                {RAM_PRESETS.map((p) => (
-                  <Button
-                    key={p.label}
-                    small
-                    disabled={Boolean(memory && p.max > memory.totalMB)}
-                    onClick={() => void applyPreset(p.min, p.max)}
-                  >
-                    {p.label}
-                  </Button>
-                ))}
+            <div className="memory-console">
+              <div className="memory-console-head">
+                <div>
+                  <div className="memory-kicker">Przydział dla Minecrafta</div>
+                  <div className="memory-value">{formatMemory(selectedMemory)}</div>
+                </div>
+                <Chip tone={levelInfo.tone}>{levelInfo.label}</Chip>
               </div>
-            </Field>
+
+              <div className="memory-slider-wrap">
+                <div className="memory-optimal-marker" style={{ left: `${optimalPosition}%` }}>
+                  <span>Optymalne · {formatMemory(optimalMemory)}</span>
+                </div>
+                <input
+                  className="memory-slider"
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={512}
+                  value={selectedMemory}
+                  aria-label="Maksymalna pamięć RAM dla Minecrafta"
+                  onChange={(event) => setSelectedMemory(Number(event.target.value))}
+                />
+                <div className="memory-scale">
+                  <span>{formatMemory(sliderMin)}</span>
+                  <span>Bezpieczne maksimum: {formatMemory(sliderMax)}</span>
+                </div>
+              </div>
+
+              <div className={`memory-advice ${level}`}>
+                <span className="memory-advice-dot" />
+                <span>{levelInfo.detail}</span>
+              </div>
+
+              <div className="row wrap" style={{ gap: 8, justifyContent: 'flex-end' }}>
+                <Button small variant="ghost" onClick={() => setSelectedMemory(optimalMemory)}>
+                  Ustaw optymalne
+                </Button>
+                <Button
+                  small
+                  variant="primary"
+                  disabled={busy || selectedMemory === (instance?.memoryMax ?? settings?.defaultMemoryMax)}
+                  onClick={() => void applyMemory(selectedMemory)}
+                >
+                  Zastosuj {formatMemory(selectedMemory)}
+                </Button>
+              </div>
+            </div>
 
             {memory?.warning && <Banner>{memory.warning}</Banner>}
 
@@ -206,4 +272,9 @@ export function JavaPage() {
       </div>
     </div>
   );
+}
+
+function formatMemory(valueMB: number): string {
+  const gb = valueMB / 1024;
+  return Number.isInteger(gb) ? `${gb} GB` : `${gb.toFixed(1)} GB`;
 }
