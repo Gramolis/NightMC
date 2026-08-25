@@ -158,6 +158,7 @@ export function installEventBridge(): () => void {
   const store = useStore.getState;
   const offs = [
     on('event:download-progress', (p: DownloadProgress) => useStore.setState({ progress: p })),
+    on('event:download-finished', () => useStore.setState({ progress: null })),
     on('event:game-state', (s: GameState) => {
       useStore.setState({ gameState: s });
       if (s.status === 'idle' || s.status === 'exited') useStore.setState({ progress: null });

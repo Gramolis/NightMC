@@ -14,10 +14,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { ensureDirs, dataDir, dbPath, instanceGameDir } from '../src/main/paths.js';
+import { ensureDirs, dataDir, dbPath, instanceGameDir, skinsDir } from '../src/main/paths.js';
 import { closeDb, initDb } from '../src/main/db.js';
 import { createInstance, getInstance, listInstances, recordPlaySession, updateInstance } from '../src/main/instances.js';
-import { addOfflineAccount, activeAccount, setActiveAccount } from '../src/main/accounts.js';
+import { addOfflineAccount, activeAccount, setActiveAccount, updateOfflineAccount } from '../src/main/accounts.js';
 import { offlineSession } from '../src/main/offline.js';
 import { DownloadQueue, hashBuffer, verifyFile } from '../src/main/downloader.js';
 import { pickJavaFor, parseJavaVersionOutput } from '../src/main/java.js';
@@ -229,6 +229,28 @@ describe('pełna ścieżka: od instancji do uruchomionego procesu', () => {
     expect(after.lastError).toBeUndefined();
 
     await fsp.rm(fakeJava, { force: true });
+  });
+
+  it('8. edytuje profil offline i kopiuje poprawną skórkę do NightMC', async () => {
+    const account = activeAccount()!;
+    const source = path.join(os.tmpdir(), `nightmc-skin-${process.pid}.png`);
+    const png = Buffer.alloc(24);
+    Buffer.from('89504e470d0a1a0a', 'hex').copy(png, 0);
+    png.writeUInt32BE(64, 16);
+    png.writeUInt32BE(64, 20);
+    await fsp.writeFile(source, png);
+
+    const updated = await updateOfflineAccount(account.id, { username: 'Nocny_Edit', skinPath: source });
+    expect(updated.username).toBe('Nocny_Edit');
+    expect(updated.uuid).not.toBe(account.uuid);
+    expect(updated.skinUrl).toBe(path.join(skinsDir(), `${account.id}.png`));
+    expect(updated.avatar).toMatch(/^data:image\/png;base64,/);
+    expect(fs.existsSync(updated.skinUrl!)).toBe(true);
+
+    const withoutSkin = await updateOfflineAccount(account.id, { username: 'Nocny_Edit', removeSkin: true });
+    expect(withoutSkin.skinUrl).toBeUndefined();
+    expect(withoutSkin.avatar).toBeUndefined();
+    await fsp.rm(source, { force: true });
   });
 });
 

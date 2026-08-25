@@ -100,6 +100,15 @@ export function PacksPage() {
     }
   };
 
+  const cancelDownload = async () => {
+    try {
+      const cancelled = await call<boolean>('game:cancelDownload');
+      if (!cancelled) pushToast('info', 'Nie ma aktywnego pobierania do anulowania.');
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    }
+  };
+
   const searchCatalog = async () => {
     if (!builderInstance || (!useModrinth && !useCurseForge)) return;
     setSearching(true);
@@ -209,6 +218,10 @@ export function PacksPage() {
   };
 
   const cancelImport = () => {
+    if (busy) {
+      void cancelDownload();
+      return;
+    }
     setToken('');
     setPreview(null);
     setName('');
@@ -482,8 +495,8 @@ export function PacksPage() {
               <Button variant="primary" onClick={() => void doImport()} disabled={busy || !name.trim() || !curseForgeReady}>
                 <IconDownload size={16} /> {busy ? 'Importuję…' : 'Importuj jako instancję'}
               </Button>
-              <Button variant="danger" onClick={cancelImport} disabled={busy}>
-                Anuluj
+              <Button variant="danger" onClick={cancelImport}>
+                {busy ? 'Anuluj pobieranie' : 'Anuluj'}
               </Button>
             </div>
           </Card>
@@ -504,6 +517,11 @@ export function PacksPage() {
                 {!progress && <span className="progress-percent">Przygotowanie…</span>}
               </div>
               {progress ? <DownloadPanel progress={progress} /> : <ProgressBar progress={0} indeterminate />}
+              <div className="row" style={{ justifyContent: 'flex-end', marginTop: 10 }}>
+                <Button small variant="danger" onClick={() => void cancelDownload()}>
+                  Anuluj pobieranie
+                </Button>
+              </div>
             </div>
           )}
           {packVersions.length === 0 ? (

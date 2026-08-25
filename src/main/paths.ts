@@ -35,6 +35,11 @@ export function cacheDir(): string {
   return path.join(dataDir(), 'cache');
 }
 
+/** Skórki profili offline skopiowane do bezpiecznego magazynu NightMC. */
+export function skinsDir(): string {
+  return path.join(dataDir(), 'skins');
+}
+
 /** Wspólny magazyn bibliotek/assetów - współdzielony przez wszystkie instancje. */
 export function sharedDir(): string {
   return path.join(dataDir(), 'shared');
@@ -85,6 +90,7 @@ export function ensureDirs(): void {
     instancesDir(),
     runtimesDir(),
     cacheDir(),
+    skinsDir(),
     sharedDir(),
     librariesDir(),
     assetsDir(),

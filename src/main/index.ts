@@ -46,7 +46,7 @@ import {
   updateInstance,
 } from './instances.js';
 import { detectJava, downloadJava, memoryAdvice, probeJava, removeManagedJava } from './java.js';
-import { addOfflineAccount, activeAccount, listAccounts, removeAccount, setActiveAccount, upsertAccount } from './accounts.js';
+import { addOfflineAccount, activeAccount, listAccounts, removeAccount, setActiveAccount, updateOfflineAccount, upsertAccount } from './accounts.js';
 import { AuthError, getValidSession, isAuthConfigured, loginMicrosoft, refreshAccount } from './auth.js';
 import { offlineSession } from './offline.js';
 import { addServer, getServer, listServers, pingServer, removeServer, updateServer } from './servers.js';
@@ -69,6 +69,7 @@ import { getNews } from './news.js';
 import { getChangelog } from './changelog.js';
 import { deleteSecret, SECRET_KEYS, secretsBackend, setSecret } from './secrets.js';
 import { DATA_SOURCES, THIRD_PARTY_LICENSES } from './licenses.js';
+import { cancelActiveDownloads } from './downloader.js';
 
 const isDev = process.env.NODE_ENV === 'development';
 const DEV_SERVER = process.env.VITE_DEV_SERVER_URL;
@@ -231,6 +232,23 @@ function emit(channel: string, payload: unknown): void {
 
 function emitProgress(p: DownloadProgress): void {
   emit('event:download-progress', p);
+}
+
+async function withDownloadLifecycle<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } finally {
+    emit('event:download-finished', null);
+  }
+}
+
+async function withGameLaunchLifecycle<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await withDownloadLifecycle(work);
+  } catch (error) {
+    setGameState({ status: 'idle' });
+    throw error;
+  }
 }
 
 function setGameState(state: GameState): void {
@@ -515,7 +533,7 @@ function registerHandlers(): void {
     setManualFile(previewToken, fileName, res.filePaths[0]);
     return res.filePaths[0];
   });
-  on('packs:import', async ({ previewToken, instanceName }) => {
+  on('packs:import', async ({ previewToken, instanceName }) => withDownloadLifecycle(async () => {
     const s = getSettings();
     const inst = await importPack(
       previewToken,
@@ -525,7 +543,7 @@ function registerHandlers(): void {
     );
     emit('event:instances-changed', null);
     return inst;
-  });
+  }));
   on('packs:exportMrpack', async ({ instanceId }) => {
     const inst = getInstance(instanceId);
     const res = await dialog.showSaveDialog({
@@ -538,14 +556,14 @@ function registerHandlers(): void {
   });
   on('packBuilder:search', (input) => searchPackCatalog(input));
   on('packBuilder:versions', (input) => packCatalogVersions(input));
-  on('packBuilder:install', async ({ instanceId, items }) => {
+  on('packBuilder:install', async ({ instanceId, items }) => withDownloadLifecycle(async () => {
     const result = await installPackBuilderItems(instanceId, items, emitProgress);
     emit('event:instances-changed', null);
     return result;
-  });
+  }));
   on('packBuilder:searchPacks', (input) => searchModpackCatalog(input));
   on('packBuilder:packVersions', (input) => modpackCatalogVersions(input));
-  on('packBuilder:installPack', async (input) => {
+  on('packBuilder:installPack', async (input) => withDownloadLifecycle(async () => {
     const s = getSettings();
     const instance = await installCatalogModpack(
       input,
@@ -554,18 +572,18 @@ function registerHandlers(): void {
     );
     emit('event:instances-changed', null);
     return instance;
-  });
+  }));
 
   /* --- Java --- */
   on('java:detect', async () => ({
     installs: await detectJava(),
     memory: memoryAdvice(os.totalmem(), os.freemem()),
   }));
-  on('java:download', async ({ major }) => {
+  on('java:download', async ({ major }) => withDownloadLifecycle(async () => {
     const install = await downloadJava(major, emitProgress);
     toast('success', `Zainstalowano Java ${install.version}.`);
     return install;
-  });
+  }));
   on('java:pick', async () => {
     const res = await dialog.showOpenDialog({
       title: 'Wskaż plik java.exe',
@@ -594,8 +612,14 @@ function registerHandlers(): void {
     }
     return saved;
   });
-  on('accounts:addOffline', ({ username, skinPath, avatar }) => {
-    const acc = addOfflineAccount(username, { skinPath, avatar });
+  on('accounts:addOffline', async ({ username, skinPath, avatar }) => {
+    let acc = addOfflineAccount(username, { avatar });
+    if (skinPath) acc = await updateOfflineAccount(acc.id, { username, skinPath });
+    emit('event:accounts-changed', null);
+    return acc;
+  });
+  on('accounts:updateOffline', async ({ id, username, skinPath, removeSkin }) => {
+    const acc = await updateOfflineAccount(id, { username, skinPath, removeSkin });
     emit('event:accounts-changed', null);
     return acc;
   });
@@ -637,10 +661,13 @@ function registerHandlers(): void {
   /* --- gra --- */
   on('game:state', () => ({ state: gameState, running: runningGames() }));
   on('game:cancelDownload', () => {
-    return true;
+    const cancelled = cancelActiveDownloads();
+    if (cancelled > 0) toast('info', 'Anulowanie pobierania…');
+    emit('event:download-finished', null);
+    return cancelled > 0;
   });
   on('game:stop', ({ instanceId }) => stopGame(instanceId));
-  on('game:launch', async ({ instanceId, serverId }) => {
+  on('game:launch', async ({ instanceId, serverId }) => withGameLaunchLifecycle(async () => {
     const account = activeAccount();
     if (!account) throw new Error('Nie wybrano profilu. Dodaj konto Microsoft albo profil Offline w zakładce "Konta".');
 
@@ -691,7 +718,7 @@ function registerHandlers(): void {
 
     refreshModCount(instanceId);
     return { pid: game.pid, instanceId, versionId: instance.versionId };
-  });
+  }));
 
   /* --- logi --- */
   on('logs:get', ({ instanceId, limit }) => getLogs(instanceId, limit ?? LIMITS.maxLogLines));

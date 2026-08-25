@@ -5,7 +5,7 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { DownloadQueue, hashBuffer, hashFile, verifyFile, writeAtomic } from '../src/main/downloader.js';
+import { cancelActiveDownloads, DownloadQueue, hashBuffer, hashFile, verifyFile, writeAtomic } from '../src/main/downloader.js';
 import { isAllowedUrl, safeUrlForMessage } from '../src/main/net.js';
 
 const PAYLOAD = Buffer.from('NightMC testowa zawartość pliku — '.repeat(500), 'utf8');
@@ -180,6 +180,18 @@ describe('kolejka pobierania', () => {
     const res = await promise;
     expect(res.cancelled).toBe(true);
     expect(res.ok).toBe(false);
+  });
+
+  it('wspólny przycisk anuluje aktywną kolejkę', async () => {
+    const q = new DownloadQueue({ allowExtraHosts: extra });
+    for (let i = 0; i < 20; i++) {
+      q.add({ id: String(i), url: `${base}/ok`, dest: path.join(tmp, `global-${i}.bin`), sha1: SHA1, size: PAYLOAD.length });
+    }
+    const promise = q.run();
+    expect(cancelActiveDownloads()).toBe(1);
+    const res = await promise;
+    expect(res.cancelled).toBe(true);
+    expect(cancelActiveDownloads()).toBe(0);
   });
 
   it('raportuje postęp z prędkością i licznikiem plików', async () => {

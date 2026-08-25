@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { call } from '../api.js';
 import { useStore } from '../store/useStore.js';
 import { Banner, Button, Card, Chip, ConfirmModal, Empty, Field, Modal } from '../components/UI.js';
-import { IconCheck, IconRefresh, IconTrash, IconUser } from '../components/Icons.js';
+import { IconCheck, IconEdit, IconRefresh, IconTrash, IconUser } from '../components/Icons.js';
 import { OFFLINE_MULTIPLAYER_WARNING, OFFLINE_PROFILE_NOTE } from '../../shared/constants.js';
 import type { Account } from '../../shared/types.js';
 
@@ -12,6 +12,7 @@ export function AccountsPage() {
   const { accounts, authConfigured, pushToast, refreshAccounts, system } = useStore();
   const [addingOffline, setAddingOffline] = useState(false);
   const [removing, setRemoving] = useState<Account | null>(null);
+  const [editing, setEditing] = useState<Account | null>(null);
   const [busy, setBusy] = useState(false);
 
   const login = async () => {
@@ -86,7 +87,7 @@ export function AccountsPage() {
           <div className="list">
             {accounts.map((a) => (
               <div key={a.id} className="list-item">
-                <div className="inst-icon" style={{ width: 40, height: 40 }}><IconUser size={18} /></div>
+                <ProfileAvatar account={a} />
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div className="list-title">{a.username}</div>
                   <div className="list-sub" style={{ fontFamily: 'monospace', marginTop: 3 }}>{a.uuid}</div>
@@ -118,6 +119,11 @@ export function AccountsPage() {
                     <IconRefresh size={14} />
                   </Button>
                 )}
+                {a.type === 'offline' && (
+                  <Button small variant="ghost" title="Edytuj profil" onClick={() => setEditing(a)}>
+                    <IconEdit size={14} />
+                  </Button>
+                )}
                 <Button small variant="danger" onClick={() => setRemoving(a)}><IconTrash size={14} /></Button>
               </div>
             ))}
@@ -130,6 +136,17 @@ export function AccountsPage() {
           onClose={() => setAddingOffline(false)}
           onSaved={() => {
             setAddingOffline(false);
+            void refreshAccounts();
+          }}
+        />
+      )}
+
+      {editing && (
+        <EditOfflineModal
+          account={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
             void refreshAccounts();
           }}
         />
@@ -153,6 +170,16 @@ export function AccountsPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function ProfileAvatar({ account }: { account: Account }) {
+  const image = account.avatar ?? (account.type === 'microsoft' ? account.skinUrl : undefined);
+  if (!image) return <div className="inst-icon" style={{ width: 40, height: 40 }}><IconUser size={18} /></div>;
+  return (
+    <div className="inst-icon" style={{ width: 40, height: 40, overflow: 'hidden' }}>
+      <img src={image} alt="" style={{ width: 32, height: 32, objectFit: 'cover', imageRendering: 'pixelated' }} />
     </div>
   );
 }
@@ -191,7 +218,7 @@ function AddOfflineModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
         <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={16} autoFocus />
       </Field>
 
-      <Field label="Lokalna skórka (opcjonalnie)" hint="Plik PNG 64×64. Skórka lokalna jest widoczna tylko dla Ciebie.">
+      <Field label="Lokalna skórka (opcjonalnie)" hint="Plik PNG 64×64 lub 64×32. NightMC zapisze własną kopię pliku w profilu.">
         <div className="row">
           <input className="input" value={skinPath} readOnly placeholder="nie wybrano" />
           <Button
@@ -210,6 +237,90 @@ function AddOfflineModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
         konto Microsoft. NightMC nie tworzy fałszywej sesji premium i nie obchodzi weryfikacji na serwerach
         z online-mode=true.
       </p>
+    </Modal>
+  );
+}
+
+function EditOfflineModal({ account, onClose, onSaved }: { account: Account; onClose: () => void; onSaved: () => void }) {
+  const { pushToast } = useStore();
+  const [username, setUsername] = useState(account.username);
+  const [skinPath, setSkinPath] = useState('');
+  const [removeSkin, setRemoveSkin] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const valid = /^[A-Za-z0-9_]{3,16}$/.test(username);
+  const renamed = username !== account.username;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await call('accounts:updateOffline', {
+        id: account.id,
+        username,
+        skinPath: skinPath || undefined,
+        removeSkin,
+      });
+      pushToast('success', 'Profil został zaktualizowany.');
+      onSaved();
+    } catch (e) {
+      pushToast('error', (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={`Edytuj profil: ${account.username}`}
+      onClose={onClose}
+      actions={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Anuluj</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={!valid || saving}>
+            {saving ? 'Zapisuję…' : 'Zapisz zmiany'}
+          </Button>
+        </>
+      }
+    >
+      <Field label="Nazwa gracza" hint="3–16 znaków: litery, cyfry i podkreślenie.">
+        <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={16} autoFocus />
+      </Field>
+
+      {renamed && (
+        <div style={{ marginBottom: 14 }}>
+          <Banner>
+            Zmiana nazwy zmieni też UUID profilu offline. Serwery i światy mogą potraktować go jak nowego gracza.
+          </Banner>
+        </div>
+      )}
+
+      <Field
+        label="Skórka profilu"
+        hint={account.skinUrl && !removeSkin ? 'Profil ma zapisaną skórkę. Możesz zastąpić ją nowym PNG.' : 'Wybierz PNG 64×64 lub 64×32.'}
+      >
+        <div className="row wrap">
+          <input className="input" value={skinPath} readOnly placeholder={account.skinUrl && !removeSkin ? 'obecna skórka' : 'nie wybrano'} />
+          <Button
+            onClick={() => void call<string | null>('accounts:pickSkin').then((p) => {
+              if (p) {
+                setSkinPath(p);
+                setRemoveSkin(false);
+              }
+            }).catch((e) => pushToast('error', (e as Error).message))}
+          >
+            Wybierz PNG
+          </Button>
+          {account.skinUrl && !removeSkin && (
+            <Button variant="danger" onClick={() => { setSkinPath(''); setRemoveSkin(true); }}>
+              Usuń skórkę
+            </Button>
+          )}
+        </div>
+      </Field>
+
+      <Banner kind="info">
+        Skórka profilu offline jest bezpiecznie zapisana w NightMC. Jej wyświetlanie wewnątrz gry wymaga zgodnej
+        obsługi po stronie klienta lub serwera; zwykły Minecraft offline nie przyjmuje lokalnego PNG od launchera.
+      </Banner>
     </Modal>
   );
 }

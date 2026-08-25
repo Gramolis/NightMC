@@ -279,6 +279,12 @@ export const INVOKE_SCHEMAS = {
     skinPath: v.optional(v.string({ max: 512 })),
     avatar: v.optional(v.string({ max: 512 })),
   }),
+  'accounts:updateOffline': v.object({
+    id: id(),
+    username: v.string({ pattern: USERNAME_PATTERN }),
+    skinPath: v.optional(v.string({ max: 512 })),
+    removeSkin: v.boolean(),
+  }),
   'accounts:remove': v.object({ id: id() }),
   'accounts:setActive': v.object({ id: id() }),
   'accounts:refresh': v.object({ id: id() }),
@@ -344,6 +350,7 @@ export type InvokePayload<C extends InvokeChannel> =
 
 export const EVENT_CHANNELS = [
   'event:download-progress',
+  'event:download-finished',
   'event:game-state',
   'event:log-line',
   'event:instances-changed',

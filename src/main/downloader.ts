@@ -102,6 +102,16 @@ export interface QueueOptions {
   phase?: string;
 }
 
+/** Kolejki aktywne w tej chwili. Używane przez wspólny przycisk „Anuluj”. */
+const activeQueues = new Set<DownloadQueue>();
+
+/** Anuluje wszystkie trwające pobrania, niezależnie od ekranu, który je uruchomił. */
+export function cancelActiveDownloads(): number {
+  const count = activeQueues.size;
+  for (const queue of activeQueues) queue.cancel();
+  return count;
+}
+
 export class DownloadQueue {
   private tasks: DownloadTask[] = [];
   private abort = new AbortController();
@@ -174,6 +184,7 @@ export class DownloadQueue {
     const concurrency = Math.max(1, Math.min(this.opts.concurrency ?? LIMITS.defaultConcurrency, LIMITS.maxConcurrency));
     let cursor = 0;
 
+    activeQueues.add(this);
     this.emit(true);
 
     const worker = async (): Promise<void> => {
@@ -195,10 +206,13 @@ export class DownloadQueue {
       }
     };
 
-    await Promise.all(Array.from({ length: Math.min(concurrency, this.tasks.length || 1) }, worker));
-    this.emit(true);
-
-    return { ok: !this.cancelled && failed.length === 0, cancelled: this.cancelled, failed };
+    try {
+      await Promise.all(Array.from({ length: Math.min(concurrency, this.tasks.length || 1) }, worker));
+      this.emit(true);
+      return { ok: !this.cancelled && failed.length === 0, cancelled: this.cancelled, failed };
+    } finally {
+      activeQueues.delete(this);
+    }
   }
 
   private async fetchOne(task: DownloadTask): Promise<void> {
