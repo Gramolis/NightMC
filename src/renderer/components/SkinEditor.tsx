@@ -9,6 +9,30 @@ const HISTORY_LIMIT = 40;
 const PALETTE = ['#f3c6a5', '#a66a4a', '#553327', '#16131f', '#f4f2ff', '#7658ff', '#35d7ff', '#39e6a3', '#ff4f87', '#ffcc57'];
 
 type Tool = 'pencil' | 'eraser' | 'fill' | 'picker';
+type EditorView = 'character' | 'texture';
+
+type FigurePart = {
+  dx: number;
+  dy: number;
+  width: number;
+  height: number;
+  sx: number;
+  sy: number;
+  overlayX: number;
+  overlayY: number;
+};
+
+const FIGURE_WIDTH = 16;
+const FIGURE_HEIGHT = 32;
+const FIGURE_PARTS: FigurePart[] = [
+  // Widok od przodu: prawa strona postaci znajduje się po lewej stronie ekranu.
+  { dx: 4, dy: 0, width: 8, height: 8, sx: 8, sy: 8, overlayX: 40, overlayY: 8 },
+  { dx: 0, dy: 8, width: 4, height: 12, sx: 44, sy: 20, overlayX: 44, overlayY: 36 },
+  { dx: 4, dy: 8, width: 8, height: 12, sx: 20, sy: 20, overlayX: 20, overlayY: 36 },
+  { dx: 12, dy: 8, width: 4, height: 12, sx: 36, sy: 52, overlayX: 52, overlayY: 52 },
+  { dx: 4, dy: 20, width: 4, height: 12, sx: 4, sy: 20, overlayX: 4, overlayY: 36 },
+  { dx: 8, dy: 20, width: 4, height: 12, sx: 20, sy: 52, overlayX: 4, overlayY: 52 },
+];
 
 function fillRect(data: Uint8ClampedArray, x: number, y: number, width: number, height: number, color: string): void {
   const [r, g, b] = hexToRgb(color);
@@ -25,17 +49,126 @@ function fillRect(data: Uint8ClampedArray, x: number, y: number, width: number, 
 
 function defaultSkin(): Uint8ClampedArray {
   const data = new Uint8ClampedArray(SKIN_SIZE * SKIN_SIZE * 4);
-  // Bazowe powierzchnie klasycznego modelu. Warstwa ubrania pozostaje przezroczysta.
-  fillRect(data, 0, 0, 32, 16, '#d59b78');
-  fillRect(data, 16, 16, 24, 16, '#201a38');
-  fillRect(data, 40, 16, 16, 16, '#d59b78');
-  fillRect(data, 0, 16, 16, 16, '#171425');
-  fillRect(data, 16, 48, 16, 16, '#171425');
-  fillRect(data, 32, 48, 16, 16, '#d59b78');
-  // Prosty znak NightMC na przodzie koszulki.
-  fillRect(data, 22, 21, 4, 7, '#7658ff');
-  fillRect(data, 26, 23, 2, 4, '#35d7ff');
+  // Klasyczny szablon Steve'a w poprawnym układzie UV 64x64.
+  const skin = '#b97855';
+  const skinLight = '#c98c68';
+  const skinShadow = '#9f6047';
+  const hair = '#35241c';
+  const hairDark = '#241711';
+  const shirt = '#08a7a5';
+  const shirtShadow = '#078b91';
+  const trousers = '#3e3d91';
+  const trousersShadow = '#302f72';
+  const shoes = '#4a3931';
+
+  // Głowa: góra/dół oraz cztery boki.
+  fillRect(data, 8, 0, 8, 8, hair);
+  fillRect(data, 16, 0, 8, 8, skinShadow);
+  fillRect(data, 0, 8, 32, 8, skin);
+  fillRect(data, 24, 8, 8, 8, hairDark);
+  fillRect(data, 8, 8, 8, 3, hair);
+  fillRect(data, 8, 11, 1, 4, hair);
+  fillRect(data, 15, 11, 1, 4, hair);
+  fillRect(data, 9, 12, 2, 1, '#f2eee8');
+  fillRect(data, 13, 12, 2, 1, '#f2eee8');
+  fillRect(data, 10, 12, 1, 1, '#395a9d');
+  fillRect(data, 13, 12, 1, 1, '#395a9d');
+  fillRect(data, 11, 14, 2, 1, skinLight);
+  fillRect(data, 11, 15, 3, 1, hairDark);
+
+  // Tułów.
+  fillRect(data, 20, 16, 8, 4, shirt);
+  fillRect(data, 28, 16, 8, 4, shirtShadow);
+  fillRect(data, 16, 20, 24, 12, shirtShadow);
+  fillRect(data, 20, 20, 8, 12, shirt);
+  fillRect(data, 21, 20, 6, 2, skinLight);
+  fillRect(data, 20, 30, 8, 2, shirtShadow);
+
+  // Prawa i lewa ręka klasycznego modelu 4 px.
+  fillRect(data, 44, 16, 4, 4, shirt);
+  fillRect(data, 48, 16, 4, 4, skinShadow);
+  fillRect(data, 40, 20, 16, 12, skin);
+  fillRect(data, 44, 20, 4, 4, shirt);
+  fillRect(data, 40, 20, 4, 12, skinShadow);
+  fillRect(data, 36, 48, 4, 4, shirt);
+  fillRect(data, 40, 48, 4, 4, skinShadow);
+  fillRect(data, 32, 52, 16, 12, skin);
+  fillRect(data, 36, 52, 4, 4, shirt);
+  fillRect(data, 44, 52, 4, 12, skinShadow);
+
+  // Nogi i buty.
+  fillRect(data, 4, 16, 4, 4, trousers);
+  fillRect(data, 8, 16, 4, 4, trousersShadow);
+  fillRect(data, 0, 20, 16, 12, trousersShadow);
+  fillRect(data, 4, 20, 4, 12, trousers);
+  fillRect(data, 4, 30, 4, 2, shoes);
+  fillRect(data, 20, 48, 4, 4, trousers);
+  fillRect(data, 24, 48, 4, 4, trousersShadow);
+  fillRect(data, 16, 52, 16, 12, trousersShadow);
+  fillRect(data, 20, 52, 4, 12, trousers);
+  fillRect(data, 20, 62, 4, 2, shoes);
   return data;
+}
+
+function drawFigure(
+  ctx: CanvasRenderingContext2D,
+  source: HTMLCanvasElement,
+  scale: number,
+  showGrid: boolean,
+): void {
+  ctx.imageSmoothingEnabled = false;
+  for (const part of FIGURE_PARTS) {
+    ctx.drawImage(
+      source,
+      part.sx,
+      part.sy,
+      part.width,
+      part.height,
+      part.dx * scale,
+      part.dy * scale,
+      part.width * scale,
+      part.height * scale,
+    );
+  }
+  // Zewnętrzna warstwa (czapka, kurtka, rękawy i nogawki) leży na bazie.
+  for (const part of FIGURE_PARTS) {
+    ctx.drawImage(
+      source,
+      part.overlayX,
+      part.overlayY,
+      part.width,
+      part.height,
+      part.dx * scale,
+      part.dy * scale,
+      part.width * scale,
+      part.height * scale,
+    );
+  }
+  if (!showGrid || scale < 7) return;
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(178, 190, 255, .22)';
+  ctx.lineWidth = 1;
+  for (const part of FIGURE_PARTS) {
+    for (let x = 0; x <= part.width; x++) {
+      const at = (part.dx + x) * scale + 0.5;
+      ctx.moveTo(at, part.dy * scale);
+      ctx.lineTo(at, (part.dy + part.height) * scale);
+    }
+    for (let y = 0; y <= part.height; y++) {
+      const at = (part.dy + y) * scale + 0.5;
+      ctx.moveTo(part.dx * scale, at);
+      ctx.lineTo((part.dx + part.width) * scale, at);
+    }
+  }
+  ctx.stroke();
+}
+
+function figurePixelAt(x: number, y: number): { x: number; y: number } | null {
+  const part = FIGURE_PARTS.find((item) => (
+    x >= item.dx && x < item.dx + item.width && y >= item.dy && y < item.dy + item.height
+  ));
+  if (!part) return null;
+  return { x: part.sx + x - part.dx, y: part.sy + y - part.dy };
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -87,6 +220,7 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
   const [zoom, setZoom] = useState(7);
   const [grid, setGrid] = useState(true);
   const [mirror, setMirror] = useState(false);
+  const [view, setView] = useState<EditorView>('character');
   const [saving, setSaving] = useState(false);
 
   const replacePixels = (next: Uint8ClampedArray) => {
@@ -106,8 +240,10 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = SKIN_SIZE * zoom;
-    canvas.height = SKIN_SIZE * zoom;
+    const width = view === 'character' ? FIGURE_WIDTH : SKIN_SIZE;
+    const height = view === 'character' ? FIGURE_HEIGHT : SKIN_SIZE;
+    canvas.width = width * zoom;
+    canvas.height = height * zoom;
     const ctx = canvas.getContext('2d')!;
     const source = document.createElement('canvas');
     source.width = SKIN_SIZE;
@@ -115,8 +251,12 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
     source.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(pixels), SKIN_SIZE, SKIN_SIZE), 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-    if (grid && zoom >= 7) {
+    if (view === 'character') {
+      drawFigure(ctx, source, zoom, grid);
+    } else {
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    }
+    if (view === 'texture' && grid && zoom >= 7) {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(178, 190, 255, .18)';
       ctx.lineWidth = 1;
@@ -129,7 +269,7 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
       }
       ctx.stroke();
     }
-  }, [pixels, zoom, grid]);
+  }, [pixels, zoom, grid, view]);
 
   useEffect(() => {
     const canvas = previewRef.current;
@@ -141,20 +281,7 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
     source.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(pixels), SKIN_SIZE, SKIN_SIZE), 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.imageSmoothingEnabled = false;
-    const draw = (sx: number, sy: number, sw: number, sh: number, dx: number, dy: number, scale = 8) =>
-      ctx.drawImage(source, sx, sy, sw, sh, dx, dy, sw * scale, sh * scale);
-    draw(8, 8, 8, 8, 32, 0);
-    draw(40, 8, 8, 8, 32, 0);
-    draw(20, 20, 8, 12, 32, 64);
-    draw(20, 36, 8, 12, 32, 64);
-    draw(44, 20, 4, 12, 0, 64);
-    draw(44, 36, 4, 12, 0, 64);
-    draw(36, 52, 4, 12, 96, 64);
-    draw(52, 52, 4, 12, 96, 64);
-    draw(4, 20, 4, 12, 32, 160);
-    draw(4, 36, 4, 12, 32, 160);
-    draw(20, 52, 4, 12, 64, 160);
-    draw(4, 52, 4, 12, 64, 160);
+    drawFigure(ctx, source, 8, false);
   }, [pixels]);
 
   const remember = () => {
@@ -164,9 +291,19 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
 
   const pointFromEvent = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
+    if (view === 'character') {
+      const figureX = Math.max(0, Math.min(FIGURE_WIDTH - 1, Math.floor(((event.clientX - rect.left) / rect.width) * FIGURE_WIDTH)));
+      const figureY = Math.max(0, Math.min(FIGURE_HEIGHT - 1, Math.floor(((event.clientY - rect.top) / rect.height) * FIGURE_HEIGHT)));
+      const point = figurePixelAt(figureX, figureY);
+      const mirrored = figurePixelAt(FIGURE_WIDTH - 1 - figureX, figureY);
+      return point ? { ...point, mirrored } : null;
+    }
+    const x = Math.max(0, Math.min(63, Math.floor(((event.clientX - rect.left) / rect.width) * SKIN_SIZE)));
+    const y = Math.max(0, Math.min(63, Math.floor(((event.clientY - rect.top) / rect.height) * SKIN_SIZE)));
     return {
-      x: Math.max(0, Math.min(63, Math.floor(((event.clientX - rect.left) / rect.width) * SKIN_SIZE))),
-      y: Math.max(0, Math.min(63, Math.floor(((event.clientY - rect.top) / rect.height) * SKIN_SIZE))),
+      x,
+      y,
+      mirrored: { x: 63 - x, y },
     };
   };
 
@@ -175,7 +312,7 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
     data.set(rgba, offset);
   };
 
-  const useToolAt = (x: number, y: number) => {
+  const applyToolAt = (x: number, y: number, mirrored?: { x: number; y: number } | null) => {
     const current = pixelsRef.current;
     const offset = (y * SKIN_SIZE + x) * 4;
     if (tool === 'picker') {
@@ -206,7 +343,7 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
       }
     } else {
       setPixel(next, x, y, rgba);
-      if (mirror) setPixel(next, 63 - x, y, rgba);
+      if (mirror && mirrored) setPixel(next, mirrored.x, mirrored.y, rgba);
     }
     replacePixels(next);
   };
@@ -214,15 +351,16 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
   const pointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = pointFromEvent(event);
+    if (!point) return;
     if (tool !== 'picker') remember();
     drawingRef.current = tool === 'pencil' || tool === 'eraser';
-    useToolAt(point.x, point.y);
+    applyToolAt(point.x, point.y, point.mirrored);
   };
 
   const pointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     if (!drawingRef.current) return;
     const point = pointFromEvent(event);
-    useToolAt(point.x, point.y);
+    if (point) applyToolAt(point.x, point.y, point.mirrored);
   };
 
   const undoOnce = () => {
@@ -308,12 +446,19 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
         <main className="skin-canvas-panel">
           <div className="skin-studio-heading">
             <div>
-              <div className="list-title">Mapa skórki 64×64</div>
-              <div className="list-sub">Kliknij albo przeciągnij, żeby malować pojedynczymi pikselami.</div>
+              <div className="list-title">{view === 'character' ? 'Malowanie na postaci' : 'Struktura skórki 64×64'}</div>
+              <div className="list-sub">
+                {view === 'character'
+                  ? 'Malujesz bezpośrednio na przodzie ludka. Strukturę wybierz do boków, tyłu i warstw ubrania.'
+                  : 'Pełna mapa UV: przód, boki, tył i zewnętrzne warstwy skórki.'}
+              </div>
             </div>
-            <Chip tone="cyan">ZOOM {zoom}×</Chip>
+            <div className="skin-view-switch" role="group" aria-label="Widok edytora">
+              <button className={view === 'character' ? 'active' : ''} onClick={() => setView('character')}>Postać</button>
+              <button className={view === 'texture' ? 'active' : ''} onClick={() => setView('texture')}>Struktura</button>
+            </div>
           </div>
-          <div className="skin-canvas-scroll">
+          <div className={`skin-canvas-scroll${view === 'character' ? ' skin-canvas-scroll--character' : ''}`}>
             <canvas
               ref={canvasRef}
               className="skin-pixel-canvas"
@@ -326,11 +471,12 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
           <div className="row skin-zoom-row">
             <span className="list-sub">Powiększenie</span>
             <input type="range" min={6} max={13} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
+            <Chip tone="cyan">{zoom}×</Chip>
           </div>
         </main>
 
         <aside className="skin-preview-panel">
-          <div className="skin-studio-label">Podgląd postaci</div>
+          <div className="skin-studio-label">Podgląd końcowy</div>
           <div className="skin-player-preview"><canvas ref={previewRef} width={128} height={256} /></div>
           <div className="skin-studio-label">Kolor</div>
           <div className="skin-color-row">
@@ -342,7 +488,7 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
               <button key={value} className={color === value ? 'active' : ''} style={{ background: value }} title={value} onClick={() => { setColor(value); setTool('pencil'); }} />
             ))}
           </div>
-          <Banner kind="info">Przezroczyste piksele tworzysz gumką. Zewnętrzne warstwy skina także znajdują się na tej mapie.</Banner>
+          <Banner kind="info">Widok Postać edytuje bazową warstwę od przodu. Boki, tył oraz warstwy ubrania zmienisz w widoku Struktura.</Banner>
         </aside>
       </div>
 
@@ -350,7 +496,7 @@ export function SkinEditor({ account, onClose, onSaved }: { account: Account; on
         <input ref={fileRef} hidden type="file" accept="image/png" onChange={(e) => void importFile(e.target.files?.[0])} />
         <Button onClick={() => fileRef.current?.click()}>Importuj PNG</Button>
         <Button variant="ghost" onClick={exportPng}>Eksportuj PNG</Button>
-        <Button variant="ghost" onClick={() => { remember(); replacePixels(defaultSkin()); }}>Nowy szablon</Button>
+        <Button variant="ghost" onClick={() => { remember(); replacePixels(defaultSkin()); }}>Szablon Steve</Button>
         <div className="spacer" />
         <Button variant="ghost" onClick={onClose} disabled={saving}>Anuluj</Button>
         <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? 'Zapisuję…' : 'Zapisz skórkę'}</Button>
