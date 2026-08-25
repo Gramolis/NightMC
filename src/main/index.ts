@@ -618,8 +618,8 @@ function registerHandlers(): void {
     emit('event:accounts-changed', null);
     return acc;
   });
-  on('accounts:updateOffline', async ({ id, username, skinPath, removeSkin }) => {
-    const acc = await updateOfflineAccount(id, { username, skinPath, removeSkin });
+  on('accounts:updateOffline', async ({ id, username, skinPath, skinData, removeSkin }) => {
+    const acc = await updateOfflineAccount(id, { username, skinPath, skinData, removeSkin });
     emit('event:accounts-changed', null);
     return acc;
   });

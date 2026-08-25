@@ -85,8 +85,7 @@ export function addOfflineAccount(username: string, opts: { skinPath?: string; a
   return created;
 }
 
-async function readSkinPng(file: string): Promise<Buffer> {
-  const data = await fsp.readFile(file);
+function validateSkinPng(data: Buffer): Buffer {
   if (data.length > 2 * 1024 * 1024) throw new Error('Skórka jest za duża (maksymalnie 2 MB)');
   const pngSignature = '89504e470d0a1a0a';
   if (data.length < 24 || data.subarray(0, 8).toString('hex') !== pngSignature) {
@@ -100,10 +99,20 @@ async function readSkinPng(file: string): Promise<Buffer> {
   return data;
 }
 
+async function readSkinPng(file: string): Promise<Buffer> {
+  return validateSkinPng(await fsp.readFile(file));
+}
+
+function decodeSkinData(value: string): Buffer {
+  const match = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match) throw new Error('Edytor przekazał nieprawidłowe dane skórki PNG');
+  return validateSkinPng(Buffer.from(match[1]!, 'base64'));
+}
+
 /** Edytuje profil offline i przechowuje wybraną skórkę niezależnie od pliku źródłowego. */
 export async function updateOfflineAccount(
   id: string,
-  input: { username: string; skinPath?: string; removeSkin?: boolean },
+  input: { username: string; skinPath?: string; skinData?: string; removeSkin?: boolean },
 ): Promise<Account> {
   const account = getAccount(id);
   if (account.type !== 'offline') throw new Error('Nazwę i lokalną skórkę można edytować tylko w profilu Offline');
@@ -122,10 +131,10 @@ export async function updateOfflineAccount(
     await fsp.rm(managedPath, { force: true });
     skinUrl = undefined;
     avatar = undefined;
-  } else if (input.skinPath) {
-    const data = await readSkinPng(input.skinPath);
+  } else if (input.skinPath || input.skinData) {
+    const data = input.skinData ? decodeSkinData(input.skinData) : await readSkinPng(input.skinPath!);
     await fsp.mkdir(skinsDir(), { recursive: true });
-    if (path.resolve(input.skinPath) !== path.resolve(managedPath)) {
+    if (!input.skinPath || path.resolve(input.skinPath) !== path.resolve(managedPath)) {
       const temp = `${managedPath}.tmp`;
       await fsp.writeFile(temp, data);
       await fsp.rm(managedPath, { force: true });

@@ -5,6 +5,7 @@ import { call } from '../api.js';
 import { useStore } from '../store/useStore.js';
 import { Banner, Button, Card, Chip, ConfirmModal, Empty, Field, Modal } from '../components/UI.js';
 import { IconCheck, IconEdit, IconRefresh, IconTrash, IconUser } from '../components/Icons.js';
+import { SkinEditor } from '../components/SkinEditor.js';
 import { OFFLINE_MULTIPLAYER_WARNING, OFFLINE_PROFILE_NOTE } from '../../shared/constants.js';
 import type { Account } from '../../shared/types.js';
 
@@ -13,6 +14,7 @@ export function AccountsPage() {
   const [addingOffline, setAddingOffline] = useState(false);
   const [removing, setRemoving] = useState<Account | null>(null);
   const [editing, setEditing] = useState<Account | null>(null);
+  const [skinEditing, setSkinEditing] = useState<Account | null>(null);
   const [busy, setBusy] = useState(false);
 
   const login = async () => {
@@ -145,8 +147,23 @@ export function AccountsPage() {
         <EditOfflineModal
           account={editing}
           onClose={() => setEditing(null)}
+          onOpenStudio={() => {
+            setSkinEditing(editing);
+            setEditing(null);
+          }}
           onSaved={() => {
             setEditing(null);
+            void refreshAccounts();
+          }}
+        />
+      )}
+
+      {skinEditing && (
+        <SkinEditor
+          account={skinEditing}
+          onClose={() => setSkinEditing(null)}
+          onSaved={() => {
+            setSkinEditing(null);
             void refreshAccounts();
           }}
         />
@@ -241,7 +258,17 @@ function AddOfflineModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
   );
 }
 
-function EditOfflineModal({ account, onClose, onSaved }: { account: Account; onClose: () => void; onSaved: () => void }) {
+function EditOfflineModal({
+  account,
+  onClose,
+  onSaved,
+  onOpenStudio,
+}: {
+  account: Account;
+  onClose: () => void;
+  onSaved: () => void;
+  onOpenStudio: () => void;
+}) {
   const { pushToast } = useStore();
   const [username, setUsername] = useState(account.username);
   const [skinPath, setSkinPath] = useState('');
@@ -316,6 +343,14 @@ function EditOfflineModal({ account, onClose, onSaved }: { account: Account; onC
           )}
         </div>
       </Field>
+
+      <div className="skin-studio-entry">
+        <div>
+          <div className="list-title">NightMC Skin Studio</div>
+          <div className="list-sub">Maluj skórkę piksel po pikselu z podglądem postaci i historią zmian.</div>
+        </div>
+        <Button variant="primary" onClick={onOpenStudio}>Otwórz edytor skinów</Button>
+      </div>
 
       <Banner kind="info">
         Skórka profilu offline jest bezpiecznie zapisana w NightMC. Jej wyświetlanie wewnątrz gry wymaga zgodnej

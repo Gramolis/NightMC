@@ -283,6 +283,7 @@ export const INVOKE_SCHEMAS = {
     id: id(),
     username: v.string({ pattern: USERNAME_PATTERN }),
     skinPath: v.optional(v.string({ max: 512 })),
+    skinData: v.optional(v.string({ max: 3_000_000 })),
     removeSkin: v.boolean(),
   }),
   'accounts:remove': v.object({ id: id() }),

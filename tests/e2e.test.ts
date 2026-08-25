@@ -250,6 +250,14 @@ describe('pełna ścieżka: od instancji do uruchomionego procesu', () => {
     const withoutSkin = await updateOfflineAccount(account.id, { username: 'Nocny_Edit', removeSkin: true });
     expect(withoutSkin.skinUrl).toBeUndefined();
     expect(withoutSkin.avatar).toBeUndefined();
+
+    const fromEditor = await updateOfflineAccount(account.id, {
+      username: 'Nocny_Edit',
+      skinData: `data:image/png;base64,${png.toString('base64')}`,
+    });
+    expect(fromEditor.avatar).toMatch(/^data:image\/png;base64,/);
+    expect(fs.existsSync(fromEditor.skinUrl!)).toBe(true);
+    await updateOfflineAccount(account.id, { username: 'Nocny_Edit', removeSkin: true });
     await fsp.rm(source, { force: true });
   });
 });

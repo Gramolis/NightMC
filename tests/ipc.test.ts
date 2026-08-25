@@ -118,6 +118,14 @@ describe('kontrakt kanałów', () => {
     expect(schema({ id: 'inst-abc' })).toEqual({ id: 'inst-abc' });
   });
 
+  it('ogranicza rozmiar skórki wysyłanej z edytora', () => {
+    const schema = INVOKE_SCHEMAS['accounts:updateOffline'];
+    expect(schema({ id: 'acc-1', username: 'Krzychu', skinData: 'data:image/png;base64,AAAA', removeSkin: false }).skinData)
+      .toBe('data:image/png;base64,AAAA');
+    expect(() => schema({ id: 'acc-1', username: 'Krzychu', skinData: 'x'.repeat(3_000_001), removeSkin: false }))
+      .toThrow(ValidationError);
+  });
+
   it('odrzuca próbę wstrzyknięcia ścieżki w nazwę pliku moda', () => {
     const schema = INVOKE_SCHEMAS['mods:delete'];
     expect(() => schema({ instanceId: 'inst-a', fileName: '../../../evil.jar' })).toThrow(ValidationError);
